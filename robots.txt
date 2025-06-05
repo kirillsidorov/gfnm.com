@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Disallow admin and test pages
+Disallow: /admin/
+Disallow: /test/
+
+# Sitemap location
+Sitemap: https://georgianfoodnearme.com/sitemap.xml
