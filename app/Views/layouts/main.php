@@ -13,7 +13,16 @@
     <!-- Ahrefs Web Analytics -->
     <script src="https://analytics.ahrefs.com/analytics.js" data-key="9F0gGvB8+Lpfv+pgst3hmA" async></script>
     
-    
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-02LE8DQ3ZB"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-02LE8DQ3ZB');
+    </script>
+
     <!-- Open Graph -->
     <meta property="og:title" content="<?= esc($title ?? 'Georgian Food Near Me') ?>">
     <meta property="og:description" content="<?= esc($meta_description ?? 'Find authentic Georgian restaurants near you') ?>">
