@@ -27,6 +27,7 @@
                     </div>
 
                     <!-- Navigation -->
+                    <!-- Navigation -->
                     <ul class="nav flex-column px-3">
                         <li class="nav-item">
                             <a class="nav-link <?= (current_url() == base_url('admin') || current_url() == base_url('admin/dashboard')) ? 'active' : '' ?>" 
@@ -35,6 +36,10 @@
                                 Дашборд
                             </a>
                         </li>
+                        
+                        <hr class="text-white-50 mx-2">
+                        
+                        <!-- ОСНОВНЫЕ РАЗДЕЛЫ -->
                         <li class="nav-item">
                             <a class="nav-link <?= (strpos(current_url(), 'admin/restaurants') !== false) ? 'active' : '' ?>" 
                                href="<?= base_url('admin/restaurants') ?>">
@@ -49,47 +54,112 @@
                                 Города
                             </a>
                         </li>
+                        
+                        <hr class="text-white-50 mx-2">
+                        
+                        <!-- ИНСТРУМЕНТЫ ИМПОРТА И ДАННЫХ -->
+                        <div class="text-white-50 small text-uppercase px-3 py-2 fw-bold">
+                            Импорт и данные
+                        </div>
+                        
                         <li class="nav-item">
-                            <a class="nav-link <?= (strpos(current_url(), 'admin/geocode') !== false) ? 'active' : '' ?>" 
-                               href="<?= base_url('admin/geocode') ?>">
-                                <i class="fas fa-map-marker-alt me-2"></i>
-                                Геокодирование
+                            <a class="nav-link <?= (strpos(current_url(), 'admin/dataforseo-import') !== false) ? 'active' : '' ?>" 
+                               href="<?= base_url('admin/dataforseo-import') ?>">
+                                <i class="fas fa-download me-2 text-warning"></i>
+                                <span>DataForSEO Import</span>
+                                <?php 
+                                // Показываем бейдж если есть рестораны без Place ID
+                                try {
+                                    $restaurantModel = model('RestaurantModel');
+                                    $withoutPlaceId = $restaurantModel->where('google_place_id IS NULL OR google_place_id =', '')->countAllResults();
+                                    if ($withoutPlaceId > 0): 
+                                ?>
+                                    <span class="badge bg-warning rounded-pill ms-1 small"><?= $withoutPlaceId > 99 ? '99+' : $withoutPlaceId ?></span>
+                                <?php endif; } catch (Exception $e) { /* ignore */ } ?>
                             </a>
                         </li>
+                        
                         <li class="nav-item">
                             <a class="nav-link <?= (strpos(current_url(), 'admin/google-photos') !== false) ? 'active' : '' ?>" 
                                href="<?= base_url('admin/google-photos') ?>">
-                                <i class="fas fa-images me-2"></i>
+                                <i class="fab fa-google me-2 text-info"></i>
                                 Google Photos
                             </a>
                         </li>
-                        <hr class="text-white-50 mx-2">
+                        
                         <li class="nav-item">
-                            <a class="nav-link" href="<?= base_url('admin/export/csv') ?>">
-                                <i class="fas fa-download me-2"></i>
-                                Экспорт
+                            <a class="nav-link <?= (strpos(current_url(), 'admin/geocode') !== false) ? 'active' : '' ?>" 
+                               href="<?= base_url('admin/geocode') ?>">
+                                <i class="fas fa-map-marker-alt me-2 text-success"></i>
+                                Геокодирование
                             </a>
                         </li>
+                        
                         <li class="nav-item">
                             <a class="nav-link" href="<?= base_url('admin/restaurants/import-csv') ?>">
-                                <i class="fas fa-file-csv"></i> Import CSV
+                                <i class="fas fa-file-csv me-2 text-secondary"></i>
+                                Import CSV
                             </a>
                         </li>
+                        
+                        <hr class="text-white-50 mx-2">
+                        
+                        <!-- СИСТЕМНЫЕ ИНСТРУМЕНТЫ -->
+                        <div class="text-white-50 small text-uppercase px-3 py-2 fw-bold">
+                            Система
+                        </div>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link <?= (strpos(current_url(), 'admin/sitemap') !== false) ? 'active' : '' ?>" 
+                               href="<?= base_url('admin/sitemap') ?>">
+                                <i class="fas fa-sitemap me-2"></i>
+                                Sitemap
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= base_url('admin/export/csv') ?>">
+                                <i class="fas fa-file-export me-2"></i>
+                                Экспорт данных
+                            </a>
+                        </li>
+                        
+                        <hr class="text-white-50 mx-2">
+                        
+                        <!-- ПРОСМОТР САЙТА -->
+                        <div class="text-white-50 small text-uppercase px-3 py-2 fw-bold">
+                            Просмотр
+                        </div>
+                        
                         <li class="nav-item">
                             <a class="nav-link" href="<?= base_url() ?>" target="_blank">
-                                <i class="fas fa-external-link-alt me-2"></i>
-                                Сайт
+                                <i class="fas fa-globe me-2"></i>
+                                Главная сайта
+                                <i class="fas fa-external-link-alt ms-1 small"></i>
                             </a>
                         </li>
+                        
                         <li class="nav-item">
-                            <a class="nav-link" href="<?= base_url('/map') ?>" target="_blank">
+                            <a class="nav-link" href="<?= base_url('map') ?>" target="_blank">
                                 <i class="fas fa-map me-2"></i>
-                                Карта
+                                Карта ресторанов
+                                <i class="fas fa-external-link-alt ms-1 small"></i>
                             </a>
                         </li>
-                        <hr class="text-white-50 mx-2">
+                        
                         <li class="nav-item">
-                            <a class="nav-link" href="<?= base_url('admin/logout') ?>" 
+                            <a class="nav-link" href="<?= base_url('import-test') ?>" target="_blank">
+                                <i class="fas fa-flask me-2 text-info"></i>
+                                Тестовая страница
+                                <i class="fas fa-external-link-alt ms-1 small"></i>
+                            </a>
+                        </li>
+                        
+                        <hr class="text-white-50 mx-2">
+                        
+                        <!-- ВЫХОД -->
+                        <li class="nav-item mt-auto">
+                            <a class="nav-link text-danger" href="<?= base_url('admin/logout') ?>" 
                                onclick="return confirm('Вы уверены, что хотите выйти?')">
                                 <i class="fas fa-sign-out-alt me-2"></i>
                                 Выход

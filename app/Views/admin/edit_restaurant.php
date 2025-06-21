@@ -426,6 +426,7 @@
                         </div>
                     </div>
                 </div>
+                
             <?php else: ?>
                 <!-- Подсказки для нового ресторана -->
                 <div class="card shadow mb-4">
@@ -463,7 +464,61 @@
                     </div>
                 </div>
             <?php endif; ?>
-
+            <?php if (isset($restaurant)): ?>
+                <!-- После существующих быстрых действий -->
+                <div class="card shadow mb-4">
+                    <div class="card-header">
+                        <h6 class="m-0 font-weight-bold text-warning">
+                            <i class="fas fa-sync me-2"></i>DataForSEO Импорт
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <?php if (!empty($restaurant['google_place_id'])): ?>
+                            <div class="d-grid gap-2 mb-3">
+                                <button type="button" class="btn btn-warning" onclick="updateSingleRestaurant(<?= $restaurant['id'] ?>)">
+                                    <i class="fas fa-sync me-1"></i>Обновить из DataForSEO
+                                </button>
+                            </div>
+                            
+                            <div class="small text-muted mb-3">
+                                <div class="mb-1">
+                                    <strong>Google Place ID:</strong><br>
+                                    <code class="small"><?= esc(substr($restaurant['google_place_id'], 0, 20)) ?>...</code>
+                                </div>
+                                <?php if (!empty($restaurant['last_updated_api'])): ?>
+                                    <div class="mb-1">
+                                        <strong>Последнее обновление:</strong><br>
+                                        <?= date('d.m.Y H:i', strtotime($restaurant['last_updated_api'])) ?>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <div class="alert alert-info p-2 mb-0">
+                                <small>
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Обновит: рейтинг, часы работы, атрибуты, описание и другие данные из Google Places
+                                </small>
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-warning p-2 mb-3">
+                                <small>
+                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                    Для импорта нужно добавить Google Place ID
+                                </small>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-info" onclick="findPlaceIdForRestaurant()">
+                                    <i class="fas fa-search me-1"></i>Найти Place ID
+                                </button>
+                                <a href="<?= base_url('admin/dataforseo-import') ?>" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-cogs me-1"></i>Импорт центр
+                                </a>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
             <!-- Карта локации (если есть координаты) -->
             <?php if (isset($restaurant) && $restaurant['latitude'] && $restaurant['longitude']): ?>
                 <div class="card shadow">
@@ -862,5 +917,178 @@ function showAlert(type, message) {
 
 // Инициализация превью при загрузке
 updatePreviews();
+</script>
+// ДОБАВИТЬ В КОНЕЦ app/Views/admin/edit_restaurant.php В СЕКЦИЮ scripts
+
+<script>
+// Функция обновления данных ресторана из DataForSEO
+function updateFromDataForSEO() {
+    const restaurantId = <?= $restaurant['id'] ?? 0 ?>;
+    const placeId = document.getElementById('google_place_id')?.value;
+    
+    if (!restaurantId) {
+        alert('Ошибка: ID ресторана не найден');
+        return;
+    }
+    
+    if (!placeId) {
+        if (!confirm('Google Place ID не заполнен. Попробовать найти его автоматически и обновить данные?')) {
+            return;
+        }
+    }
+    
+    const button = document.querySelector('[onclick*="updateFromDataForSEO"]');
+    if (!button) {
+        // Если кнопка вызвана не через onclick, ищем по тексту
+        const buttons = document.querySelectorAll('button');
+        for (let btn of buttons) {
+            if (btn.textContent.includes('DataForSEO')) {
+                button = btn;
+                break;
+            }
+        }
+    }
+    
+    const originalText = button ? button.innerHTML : '';
+    
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Обновление...';
+    }
+    
+    // Показываем уведомление о начале процесса
+    showAlert('info', 'Начинаем обновление данных из DataForSEO...', 3000);
+    
+    fetch(`/admin/restaurants/update-from-dataforseo/${restaurantId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            current_place_id: placeId,
+            restaurant_name: document.getElementById('name')?.value || '',
+            restaurant_address: document.getElementById('address')?.value || ''
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', data.message || 'Данные успешно обновлены из DataForSEO!', 5000);
+            
+            // Обновляем поля формы если данные изменились
+            if (data.updated_data) {
+                updateFormFields(data.updated_data);
+            }
+            
+            // Предлагаем перезагрузить страницу для отображения всех изменений
+            setTimeout(() => {
+                if (confirm('Данные обновлены! Перезагрузить страницу для отображения всех изменений?')) {
+                    window.location.reload();
+                }
+            }, 2000);
+            
+        } else {
+            showAlert('danger', data.message || 'Ошибка при обновлении данных', 8000);
+        }
+    })
+    .catch(error => {
+        console.error('Ошибка:', error);
+        showAlert('danger', 'Ошибка при выполнении запроса: ' + error.message, 8000);
+    })
+    .finally(() => {
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    });
+}
+
+// Функция обновления полей формы
+function updateFormFields(updatedData) {
+    const fieldsMap = {
+        'name': 'name',
+        'description': 'description', 
+        'rating': 'rating',
+        'phone': 'phone',
+        'website': 'website',
+        'address': 'address',
+        'google_place_id': 'google_place_id',
+        'latitude': 'latitude',
+        'longitude': 'longitude'
+    };
+    
+    for (const [apiField, formField] of Object.entries(fieldsMap)) {
+        if (updatedData[apiField] !== undefined) {
+            const element = document.getElementById(formField);
+            if (element) {
+                const oldValue = element.value;
+                const newValue = updatedData[apiField];
+                
+                if (oldValue !== newValue) {
+                    element.value = newValue;
+                    // Подсвечиваем обновленное поле
+                    element.classList.add('border-success');
+                    setTimeout(() => {
+                        element.classList.remove('border-success');
+                    }, 3000);
+                }
+            }
+        }
+    }
+}
+
+// Улучшенная функция показа уведомлений
+function showAlert(type, message, duration = 5000) {
+    // Удаляем предыдущие уведомления этого типа
+    const existingAlerts = document.querySelectorAll(`.alert-${type}.dataforseo-alert`);
+    existingAlerts.forEach(alert => alert.remove());
+    
+    const alertClass = `alert-${type}`;
+    const iconClass = type === 'success' ? 'check-circle' : 
+                     type === 'danger' ? 'exclamation-circle' : 
+                     type === 'warning' ? 'exclamation-triangle' : 'info-circle';
+    
+    const alertId = 'alert-' + Date.now();
+    const alert = document.createElement('div');
+    alert.id = alertId;
+    alert.className = `alert ${alertClass} alert-dismissible fade show position-fixed dataforseo-alert`;
+    alert.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 350px; max-width: 500px;';
+    
+    alert.innerHTML = `
+        <div class="d-flex align-items-start">
+            <i class="fas fa-${iconClass} me-2 mt-1"></i>
+            <div class="flex-grow-1">
+                ${message}
+            </div>
+            <button type="button" class="btn-close ms-2" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    document.body.appendChild(alert);
+    
+    // Автоматическое скрытие
+    setTimeout(() => {
+        const alertElement = document.getElementById(alertId);
+        if (alertElement) {
+            alertElement.classList.remove('show');
+            setTimeout(() => alertElement.remove(), 300);
+        }
+    }, duration);
+}
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    // Проверяем наличие кнопки DataForSEO и добавляем обработчик если нужно
+    const dataForSeoButtons = document.querySelectorAll('button');
+    dataForSeoButtons.forEach(button => {
+        if (button.textContent.includes('DataForSEO') || button.textContent.includes('Обновить из DataForSEO')) {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                updateFromDataForSEO();
+            });
+        }
+    });
+});
 </script>
 <?= $this->endSection() ?>

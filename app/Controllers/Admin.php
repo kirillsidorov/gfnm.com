@@ -2080,4 +2080,248 @@ public function importGooglePhotos($restaurantId)
         'message' => 'Функция импорта уже реализована'
     ]);
 }
+// ДОБАВИТЬ В app/Controllers/Admin.php
+
+/**
+ * Обновление ресторана из DataForSEO API
+ */
+public function updateFromDataForSEO($restaurantId)
+{
+    if (!is_numeric($restaurantId)) {
+        return $this->response->setJSON([
+            'success' => false,
+            'message' => 'Неверный ID ресторана'
+        ]);
+    }
+
+    $restaurantModel = model('RestaurantModel');
+    $restaurant = $restaurantModel->find($restaurantId);
+
+    if (!$restaurant) {
+        return $this->response->setJSON([
+            'success' => false,
+            'message' => 'Ресторан не найден'
+        ]);
+    }
+
+    try {
+        // Получаем данные из POST запроса
+        $input = $this->request->getJSON(true);
+        $currentPlaceId = $input['current_place_id'] ?? $restaurant['google_place_id'];
+        $restaurantName = $input['restaurant_name'] ?? $restaurant['name'];
+        $restaurantAddress = $input['restaurant_address'] ?? $restaurant['address'];
+
+        // Если нет Place ID, пытаемся найти его
+        if (empty($currentPlaceId)) {
+            $placeIdResult = $this->findPlaceIdForRestaurant($restaurantName, $restaurantAddress);
+            
+            if ($placeIdResult['success']) {
+                $currentPlaceId = $placeIdResult['place_id'];
+                // Сохраняем найденный Place ID
+                $restaurantModel->update($restaurantId, ['google_place_id' => $currentPlaceId]);
+            } else {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Google Place ID не найден. Попробуйте добавить его вручную.'
+                ]);
+            }
+        }
+
+        // Получаем данные из DataForSEO
+        $result = $this->getDataFromDataForSEO($currentPlaceId);
+        
+        if (!$result['success']) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => $result['message']
+            ]);
+        }
+
+        // Обновляем данные ресторана
+        $updateData = $this->prepareUpdateData($result['data'], $restaurant);
+        
+        if (!empty($updateData)) {
+            $updateData['updated_at'] = date('Y-m-d H:i:s');
+            $updateData['last_updated_api'] = date('Y-m-d H:i:s');
+            
+            if ($restaurantModel->update($restaurantId, $updateData)) {
+                // Логируем обновление
+                log_message('info', "Restaurant {$restaurantId} updated from DataForSEO with Place ID: {$currentPlaceId}");
+                
+                return $this->response->setJSON([
+                    'success' => true,
+                    'message' => 'Данные ресторана успешно обновлены из DataForSEO!',
+                    'updated_data' => $updateData,
+                    'place_id' => $currentPlaceId
+                ]);
+            } else {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Ошибка при сохранении данных в базе'
+                ]);
+            }
+        } else {
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => 'Данные уже актуальны. Обновление не требуется.',
+                'updated_data' => []
+            ]);
+        }
+
+    } catch (\Exception $e) {
+        log_message('error', 'DataForSEO update error: ' . $e->getMessage());
+        return $this->response->setJSON([
+            'success' => false,
+            'message' => 'Ошибка при обновлении: ' . $e->getMessage()
+        ]);
+    }
+}
+
+/**
+ * Поиск Place ID для ресторана
+ */
+private function findPlaceIdForRestaurant($name, $address = '')
+{
+    try {
+        $dataForSeoService = new \App\Services\DataForSeoService();
+        return $dataForSeoService->findPlaceId($name, $address);
+    } catch (\Exception $e) {
+        return [
+            'success' => false,
+            'message' => 'Ошибка поиска Place ID: ' . $e->getMessage()
+        ];
+    }
+}
+
+/**
+ * Получение данных из DataForSEO API
+ */
+private function getDataFromDataForSEO($placeId)
+{
+    try {
+        $dataForSeoService = new \App\Services\DataForSeoService();
+        $result = $dataForSeoService->searchByPlaceId($placeId);
+        
+        if (!$result['success']) {
+            return [
+                'success' => false,
+                'message' => 'Ошибка API DataForSEO: ' . ($result['error'] ?? 'Неизвестная ошибка')
+            ];
+        }
+
+        // Извлекаем данные из ответа API
+        $data = $result['data'];
+        if (empty($data['tasks']) || $data['tasks'][0]['status_code'] !== 20000) {
+            return [
+                'success' => false,
+                'message' => 'API вернул ошибку или не найдены данные'
+            ];
+        }
+
+        $items = $data['tasks'][0]['result'][0]['items'] ?? [];
+        if (empty($items)) {
+            return [
+                'success' => false,
+                'message' => 'Данные ресторана не найдены в DataForSEO'
+            ];
+        }
+
+        return [
+            'success' => true,
+            'data' => $items[0] // Берем первый результат
+        ];
+
+    } catch (\Exception $e) {
+        return [
+            'success' => false,
+            'message' => 'Ошибка получения данных: ' . $e->getMessage()
+        ];
+    }
+}
+
+/**
+ * Подготовка данных для обновления
+ */
+private function prepareUpdateData($apiData, $currentData)
+{
+    $updateData = [];
+
+    // Маппинг полей API -> поля БД
+    $fieldMapping = [
+        'title' => 'name',
+        'description' => 'description',
+        'phone' => 'phone',
+        'url' => 'website',
+        'address' => 'address',
+        'latitude' => 'latitude',
+        'longitude' => 'longitude'
+    ];
+
+    // Обновляем только если новые данные отличаются и не пустые
+    foreach ($fieldMapping as $apiField => $dbField) {
+        if (isset($apiData[$apiField]) && !empty($apiData[$apiField])) {
+            $newValue = $apiData[$apiField];
+            $oldValue = $currentData[$dbField] ?? '';
+            
+            // Специальная обработка для некоторых полей
+            if ($dbField === 'website' && !filter_var($newValue, FILTER_VALIDATE_URL)) {
+                continue; // Пропускаем невалидные URL
+            }
+            
+            if ($dbField === 'phone') {
+                $newValue = $this->formatPhone($newValue);
+            }
+            
+            // Обновляем только если значения отличаются
+            if (trim($oldValue) !== trim($newValue)) {
+                $updateData[$dbField] = $newValue;
+            }
+        }
+    }
+
+    // Обновляем рейтинг
+    if (isset($apiData['rating']['value']) && $apiData['rating']['value'] > 0) {
+        $newRating = floatval($apiData['rating']['value']);
+        $oldRating = floatval($currentData['rating'] ?? 0);
+        
+        if (abs($newRating - $oldRating) > 0.1) { // Обновляем если разница больше 0.1
+            $updateData['rating'] = $newRating;
+        }
+    }
+
+    // Обновляем уровень цен
+    if (isset($apiData['price_level']) && !empty($apiData['price_level'])) {
+        $priceLevel = $this->convertPriceLevel($apiData['price_level']);
+        if ($priceLevel !== $currentData['price_level']) {
+            $updateData['price_level'] = $priceLevel;
+        }
+    }
+
+    // Обновляем CID если есть
+    if (isset($apiData['cid']) && !empty($apiData['cid'])) {
+        $updateData['cid'] = $apiData['cid'];
+    }
+
+    return $updateData;
+}
+
+/**
+ * Форматирование номера телефона
+ */
+private function formatPhone($phone)
+{
+    // Простое форматирование - убираем лишние символы
+    return preg_replace('/[^\d+()-\s]/', '', $phone);
+}
+
+/**
+ * Конвертация уровня цен
+ */
+private function convertPriceLevel($priceLevel)
+{
+    if (is_string($priceLevel)) {
+        return substr_count($priceLevel, '$');
+    }
+    return max(0, min(4, intval($priceLevel)));
+}
 }

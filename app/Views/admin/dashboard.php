@@ -375,22 +375,88 @@
                     </h6>
                 </div>
                 <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <a href="<?= base_url('admin/restaurants') ?>" class="btn btn-primary">
-                            <i class="fas fa-utensils me-2"></i>Управление ресторанами
-                        </a>
-                        <a href="<?= base_url('admin/cities') ?>" class="btn btn-info">
-                            <i class="fas fa-city me-2"></i>Управление городами
-                        </a>
-                        <a href="<?= base_url('admin/geocode') ?>" class="btn btn-warning">
-                            <i class="fas fa-map-marker-alt me-2"></i>Геокодирование
-                        </a>
-                        <a href="<?= base_url('admin/google-photos') ?>" class="btn btn-success">
-                            <i class="fab fa-google me-2"></i>Google Photos
-                        </a>
-                        <a href="<?= base_url('admin/sitemap') ?>" class="btn btn-secondary">
-                            <i class="fas fa-sitemap me-2"></i>Управление Sitemap
-                        </a>
+                    <div class="row">
+                        <!-- Основные разделы -->
+                        <div class="col-md-2 mb-3">
+                            <a href="<?= base_url('admin/restaurants') ?>" class="btn btn-primary btn-block">
+                                <i class="fas fa-utensils mb-2"></i>
+                                <br>Рестораны
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="<?= base_url('admin/cities') ?>" class="btn btn-info btn-block">
+                                <i class="fas fa-city mb-2"></i>
+                                <br>Города
+                            </a>
+                        </div>
+                        
+                        <!-- DataForSEO Import - выделяем как важный -->
+                        <div class="col-md-2 mb-3">
+                            <a href="<?= base_url('admin/dataforseo-import') ?>" class="btn btn-warning btn-block position-relative">
+                                <i class="fas fa-download mb-2"></i>
+                                <br>DataForSEO
+                                <br><small>Import</small>
+                                <?php 
+                                // Показываем уведомление если есть рестораны без Place ID
+                                try {
+                                    $restaurantModel = model('RestaurantModel');
+                                    $withoutPlaceId = $restaurantModel->where('google_place_id IS NULL OR google_place_id =', '')->countAllResults();
+                                    if ($withoutPlaceId > 0): 
+                                ?>
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                        <?= $withoutPlaceId > 99 ? '99+' : $withoutPlaceId ?>
+                                        <span class="visually-hidden">ресторанов без Place ID</span>
+                                    </span>
+                                <?php endif; } catch (Exception $e) { /* ignore */ } ?>
+                            </a>
+                        </div>
+                        
+                        <!-- Другие инструменты -->
+                        <div class="col-md-2 mb-3">
+                            <a href="<?= base_url('admin/google-photos') ?>" class="btn btn-success btn-block">
+                                <i class="fab fa-google mb-2"></i>
+                                <br>Google Photos
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="<?= base_url('admin/geocode') ?>" class="btn btn-secondary btn-block">
+                                <i class="fas fa-map-marker-alt mb-2"></i>
+                                <br>Геокодирование
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="<?= base_url('admin/sitemap') ?>" class="btn btn-outline-primary btn-block">
+                                <i class="fas fa-sitemap mb-2"></i>
+                                <br>Sitemap
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Дополнительная строка с менее важными действиями -->
+                    <hr class="my-3">
+                    <div class="row">
+                        <div class="col-md-3 mb-2">
+                            <a href="<?= base_url('admin/export/csv') ?>" class="btn btn-outline-secondary btn-sm w-100">
+                                <i class="fas fa-file-export me-1"></i>Экспорт данных
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="<?= base_url('admin/restaurants/import-csv') ?>" class="btn btn-outline-secondary btn-sm w-100">
+                                <i class="fas fa-file-csv me-1"></i>Import CSV
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="<?= base_url('map') ?>" target="_blank" class="btn btn-outline-info btn-sm w-100">
+                                <i class="fas fa-map me-1"></i>Карта сайта
+                                <i class="fas fa-external-link-alt ms-1 small"></i>
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="<?= base_url('import-test') ?>" target="_blank" class="btn btn-outline-success btn-sm w-100">
+                                <i class="fas fa-flask me-1"></i>Тестирование
+                                <i class="fas fa-external-link-alt ms-1 small"></i>
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>

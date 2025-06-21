@@ -106,7 +106,11 @@ $routes->group('admin', ['filter' => 'adminauth'], function($routes) {
     $routes->post('restaurants/check-seo-url-availability', 'Admin::checkSeoUrlAvailability');
     $routes->post('restaurants/generate-slug', 'Admin::generateSlug');
     $routes->post('restaurants/generate-missing-seo-urls', 'Admin::generateMissingSeoUrls');
-    
+
+
+    $routes->post('restaurants/update-from-dataforseo/(:num)', 'Admin::updateFromDataForSEO/$1');
+
+
     // ===== УПРАВЛЕНИЕ ФОТОГРАФИЯМИ =====
     $routes->match(['get', 'post'], 'restaurants/(:num)/photos', 'Restaurants::uploadPhoto/$1');
     $routes->post('photos/(:num)/set-main', 'Restaurants::setMainPhoto/$1');
@@ -178,6 +182,27 @@ $routes->group('admin', ['filter' => 'adminauth'], function($routes) {
     
     // Dashboard stats
     $routes->get('dashboard/stats', 'Admin::dashboardStats');
+
+    // Главная страница импорта
+    $routes->get('dataforseo-import', 'DataForSeoImport::index');
+    
+    // Обновление одного ресторана
+    $routes->post('update-restaurant/(:num)', 'DataForSeoImport::updateRestaurant/$1');
+    
+    // Массовое обновление
+    $routes->post('bulk-update', 'DataForSeoImport::bulkUpdate');
+    
+    // Поиск и импорт новых
+    $routes->post('search-and-import', 'DataForSeoImport::searchAndImport');
+    
+    // Проверка статуса API
+    $routes->get('check-api-status', 'DataForSeoImport::checkApiStatus');
+    
+    // Поиск Place ID
+    $routes->post('find-place-id', 'DataForSeoImport::findPlaceId');
+    
+    // Экспорт логов
+    $routes->get('export-logs', 'DataForSeoImport::exportLogs');
 });
 
 // ===== API ДЛЯ КАРТЫ =====
