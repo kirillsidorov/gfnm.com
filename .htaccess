@@ -1,0 +1,28 @@
+RewriteEngine On
+
+
+RewriteRule ^uploads/(.+)$ public/uploads/$1 [L]
+
+# Обработка uploads для shared hosting
+RewriteRule ^uploads/(.*)$ ./public/uploads/$1 [L]
+
+# Если кто-то пытается зайти напрямую в /public/ - редирект
+RewriteCond %{THE_REQUEST} \s/+public/([^\s?]*) [NC]
+RewriteRule ^ /%1 [R=301,L]
+
+# Все остальное направляем в public/index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ ./public/index.php/$1 [L]
+
+# Защищаем важные папки
+RewriteRule ^(app|system|writable|vendor|tests)(/.*|$) - [F,L]
+
+# Защищаем .env файл
+<Files ".env">
+    Require all denied
+</Files>
+
+# Редирект на https
+RewriteCond %{HTTP_HOST} ^.*$
+RewriteRule ^/?$ "https://georgianfoodnearme.com/" [R=301,L]
