@@ -1,471 +1,449 @@
 <?= $this->extend('layouts/admin') ?>
 
-<?= $this->section('title') ?><?= $title ?><?= $this->endSection() ?>
-
-<?= $this->section('page_title') ?>
-<i class="fas fa-tachometer-alt me-2"></i>Дашборд
-<?= $this->endSection() ?>
+<?= $this->section('title') ?>Dashboard - Georgian Food Admin<?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
+<div class="container-fluid py-4">
+    <!-- Заголовок страницы -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-tachometer-alt me-2 text-primary"></i>
+                Панель управления
+            </h1>
+            <p class="text-muted mb-0">Georgian Food Near Me - Административная панель</p>
+        </div>
+        <div class="text-end">
+            <small class="text-muted">Последнее обновление: <?= date('d.m.Y H:i') ?></small>
+        </div>
+    </div>
 
-<!-- Statistics Cards -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card text-white bg-primary">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <h4 class="mb-0"><?= number_format($stats['total_restaurants']) ?></h4>
-                        <p class="mb-0">Всего ресторанов</p>
+    <!-- Основная статистика - КРАСИВЫЕ КАРТОЧКИ -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card bg-primary text-white shadow h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-white-75 small text-uppercase mb-1">Всего ресторанов</div>
+                            <div class="h2 mb-0 font-weight-bold"><?= number_format($stats['total_restaurants']) ?></div>
+                        </div>
+                        <div class="text-white-50">
+                            <i class="fas fa-utensils fa-2x"></i>
+                        </div>
                     </div>
-                    <div class="ms-3">
-                        <i class="fas fa-utensils fa-2x"></i>
-                    </div>
+                </div>
+                <div class="card-footer d-flex align-items-center justify-content-between">
+                    <a class="small text-white stretched-link" href="<?= base_url('admin/restaurants') ?>">
+                        Управление ресторанами
+                    </a>
+                    <div class="small text-white"><i class="fas fa-angle-right"></i></div>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-success">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <h4 class="mb-0"><?= number_format($stats['active_restaurants']) ?></h4>
-                        <p class="mb-0">Активных</p>
-                    </div>
-                    <div class="ms-3">
-                        <i class="fas fa-check-circle fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-info">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <h4 class="mb-0"><?= number_format($stats['total_cities']) ?></h4>
-                        <p class="mb-0">Городов</p>
-                    </div>
-                    <div class="ms-3">
-                        <i class="fas fa-city fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-warning">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <h4 class="mb-0"><?= number_format($stats['recent_additions']) ?></h4>
-                        <p class="mb-0">За неделю</p>
-                    </div>
-                    <div class="ms-3">
-                        <i class="fas fa-calendar-week fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- SEO & Technical Status -->
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-sitemap me-2"></i>SEO Status
-                </h5>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card bg-success text-white shadow h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-white-75 small text-uppercase mb-1">Активные</div>
+                            <div class="h2 mb-0 font-weight-bold"><?= number_format($stats['active_restaurants']) ?></div>
+                            <div class="small text-white-75">
+                                <?= $stats['total_restaurants'] > 0 ? round(($stats['active_restaurants'] / $stats['total_restaurants']) * 100, 1) : 0 ?>% от общего числа
+                            </div>
+                        </div>
+                        <div class="text-white-50">
+                            <i class="fas fa-check-circle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer d-flex align-items-center justify-content-between">
+                    <a class="small text-white stretched-link" href="<?= base_url('admin/restaurants?status=active') ?>">
+                        Активные рестораны
+                    </a>
+                    <div class="small text-white"><i class="fas fa-angle-right"></i></div>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-6">
-                        <div class="d-flex align-items-center">
-                            <div class="me-3">
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card bg-info text-white shadow h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-white-75 small text-uppercase mb-1">Города</div>
+                            <div class="h2 mb-0 font-weight-bold"><?= number_format($stats['total_cities']) ?></div>
+                            <div class="small text-white-75">
+                                С координатами: <?= $stats['cities_with_coordinates'] ?>
+                            </div>
+                        </div>
+                        <div class="text-white-50">
+                            <i class="fas fa-map-marker-alt fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer d-flex align-items-center justify-content-between">
+                    <a class="small text-white stretched-link" href="<?= base_url('admin/cities') ?>">
+                        Управление городами
+                    </a>
+                    <div class="small text-white"><i class="fas fa-angle-right"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card bg-warning text-white shadow h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-white-75 small text-uppercase mb-1">За неделю</div>
+                            <div class="h2 mb-0 font-weight-bold">+<?= number_format($stats['recent_additions']) ?></div>
+                            <div class="small text-white-75">Новых ресторанов</div>
+                        </div>
+                        <div class="text-white-50">
+                            <i class="fas fa-calendar-week fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer d-flex align-items-center justify-content-between">
+                    <span class="small text-white">За последние 7 дней</span>
+                    <div class="small text-white"><i class="fas fa-chart-line"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Дополнительная статистика данных -->
+    <div class="row mb-4">
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                С координатами
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                <?= $stats['restaurants_with_coordinates'] ?>
+                            </div>
+                            <div class="mt-2 mb-0">
+                                <div class="progress">
+                                    <?php $coordsPercent = $stats['total_restaurants'] > 0 ? ($stats['restaurants_with_coordinates'] / $stats['total_restaurants']) * 100 : 0; ?>
+                                    <div class="progress-bar bg-success" style="width: <?= $coordsPercent ?>%"></div>
+                                </div>
+                                <small class="text-muted"><?= round($coordsPercent, 1) ?>% от общего числа</small>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-map-pin fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                С фотографиями
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
                                 <?php 
-                                $sitemapExists = file_exists(FCPATH . '../writable/uploads/sitemap.xml');
-                                $iconClass = $sitemapExists ? 'fas fa-check-circle text-success' : 'fas fa-times-circle text-danger';
+                                // Подсчитаем рестораны с фотографиями (если есть доступ к PhotoModel)
+                                $restaurantsWithPhotos = 0;
+                                try {
+                                    $photoModel = new \App\Models\RestaurantPhotoModel();
+                                    $restaurantsWithPhotos = $photoModel->select('restaurant_id')
+                                        ->groupBy('restaurant_id')
+                                        ->countAllResults();
+                                } catch (Exception $e) {
+                                    // Если модели нет, покажем 0
+                                }
+                                echo $restaurantsWithPhotos;
                                 ?>
-                                <i class="<?= $iconClass ?> fa-lg"></i>
                             </div>
-                            <div>
-                                <h6 class="mb-0">Sitemap.xml</h6>
-                                <small class="text-muted">
-                                    <?php if ($sitemapExists): ?>
-                                        <?= date('d.m.Y H:i', filemtime(FCPATH . '../writable/uploads/sitemap.xml')) ?>
-                                    <?php else: ?>
-                                        Не создан
-                                    <?php endif; ?>
-                                </small>
+                            <div class="mt-2 mb-0">
+                                <div class="progress">
+                                    <?php $photosPercent = $stats['total_restaurants'] > 0 ? ($restaurantsWithPhotos / $stats['total_restaurants']) * 100 : 0; ?>
+                                    <div class="progress-bar bg-info" style="width: <?= $photosPercent ?>%"></div>
+                                </div>
+                                <small class="text-muted"><?= round($photosPercent, 1) ?>% от общего числа</small>
                             </div>
                         </div>
+                        <div class="col-auto">
+                            <i class="fas fa-images fa-2x text-gray-300"></i>
+                        </div>
                     </div>
-                    <div class="col-6">
-                        <div class="d-flex align-items-center">
-                            <div class="me-3">
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                С Google Place ID
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
                                 <?php 
-                                $robotsExists = file_exists(FCPATH . 'robots.txt');
-                                $iconClass = $robotsExists ? 'fas fa-check-circle text-success' : 'fas fa-times-circle text-danger';
+                                // Подсчитаем рестораны с Google Place ID
+                                $restaurantsWithPlaceId = 0;
+                                try {
+                                    $restaurantModel = model('RestaurantModel');
+                                    $restaurantsWithPlaceId = $restaurantModel
+                                        ->where('google_place_id IS NOT NULL')
+                                        ->where('google_place_id !=', '')
+                                        ->countAllResults();
+                                } catch (Exception $e) {
+                                    // Если ошибка, покажем 0
+                                }
+                                echo $restaurantsWithPlaceId;
                                 ?>
-                                <i class="<?= $iconClass ?> fa-lg"></i>
                             </div>
-                            <div>
-                                <h6 class="mb-0">Robots.txt</h6>
-                                <small class="text-muted">
-                                    <?= $robotsExists ? 'Создан' : 'Не создан' ?>
-                                </small>
+                            <div class="mt-2 mb-0">
+                                <div class="progress">
+                                    <?php $placeIdPercent = $stats['total_restaurants'] > 0 ? ($restaurantsWithPlaceId / $stats['total_restaurants']) * 100 : 0; ?>
+                                    <div class="progress-bar bg-warning" style="width: <?= $placeIdPercent ?>%"></div>
+                                </div>
+                                <small class="text-muted"><?= round($placeIdPercent, 1) ?>% от общего числа</small>
                             </div>
                         </div>
-                    </div>
-                </div>
-                <hr>
-                <div class="d-grid gap-2 d-md-flex">
-                    <a href="<?= base_url('admin/sitemap') ?>" class="btn btn-outline-primary btn-sm">
-                        <i class="fas fa-cogs me-1"></i>Управление sitemap
-                    </a>
-                    <?php if ($sitemapExists): ?>
-                        <a href="<?= base_url('sitemap.xml') ?>" target="_blank" class="btn btn-outline-info btn-sm">
-                            <i class="fas fa-external-link-alt me-1"></i>Просмотр
-                        </a>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-map-marker-alt me-2"></i>Геокодирование
-                </h5>
-            </div>
-            <div class="card-body">
-                <?php
-                $restaurantsWithCoords = $stats['restaurants_with_coordinates'] ?? 0;
-                $citiesWithCoords = $stats['cities_with_coordinates'] ?? 0;
-                $geoPercentage = $stats['total_restaurants'] > 0 ? 
-                    round(($restaurantsWithCoords / $stats['total_restaurants']) * 100, 1) : 0;
-                ?>
-                <div class="row g-3">
-                    <div class="col-6">
-                        <div class="text-center">
-                            <h4 class="text-primary mb-1"><?= $restaurantsWithCoords ?></h4>
-                            <small class="text-muted">Ресторанов с координатами</small>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="text-center">
-                            <h4 class="text-success mb-1"><?= $citiesWithCoords ?></h4>
-                            <small class="text-muted">Городов с координатами</small>
+                        <div class="col-auto">
+                            <i class="fab fa-google fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
-                <div class="progress mt-3" style="height: 8px;">
-                    <div class="progress-bar" role="progressbar" 
-                         style="width: <?= $geoPercentage ?>%" 
-                         aria-valuenow="<?= $geoPercentage ?>" 
-                         aria-valuemin="0" aria-valuemax="100">
-                    </div>
-                </div>
-                <div class="text-center mt-2">
-                    <small class="text-muted"><?= $geoPercentage ?>% геокодировано</small>
-                </div>
-                <hr>
-                <div class="d-grid">
-                    <a href="<?= base_url('admin/geocode') ?>" class="btn btn-outline-primary btn-sm">
-                        <i class="fas fa-map-marker-alt me-1"></i>Управление координатами
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Quick Actions -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="card-title mb-0">
-            <i class="fas fa-bolt me-2"></i>Быстрые действия
-        </h5>
-    </div>
-    <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-2">
-                <div class="d-grid">
-                    <a href="<?= base_url('admin/restaurants') ?>" class="btn btn-outline-primary">
-                        <i class="fas fa-utensils d-block mb-1"></i>
-                        <small>Рестораны</small>
-                    </a>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="d-grid">
-                    <a href="<?= base_url('admin/cities') ?>" class="btn btn-outline-info">
-                        <i class="fas fa-city d-block mb-1"></i>
-                        <small>Города</small>
-                    </a>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="d-grid">
-                    <a href="<?= base_url('admin/sitemap') ?>" class="btn btn-outline-success">
-                        <i class="fas fa-sitemap d-block mb-1"></i>
-                        <small>Sitemap</small>
-                    </a>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="d-grid">
-                    <a href="<?= base_url('admin/geocode') ?>" class="btn btn-outline-warning">
-                        <i class="fas fa-map-marker-alt d-block mb-1"></i>
-                        <small>Координаты</small>
-                    </a>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="d-grid">
-                    <a href="<?= base_url('map') ?>" target="_blank" class="btn btn-outline-secondary">
-                        <i class="fas fa-map d-block mb-1"></i>
-                        <small>Карта</small>
-                    </a>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="d-grid">
-                    <a href="<?= base_url() ?>" target="_blank" class="btn btn-outline-dark">
-                        <i class="fas fa-external-link-alt d-block mb-1"></i>
-                        <small>Сайт</small>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Search Restaurants -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0">
-            <i class="fas fa-search me-2"></i>
-            Поиск и добавление ресторанов
-        </h5>
-    </div>
-    <div class="card-body">
-        <form method="POST" action="<?= base_url('admin/search') ?>">
-            <div class="row">
-                <div class="col-md-8">
-                    <input type="text" class="form-control" name="city_name" 
-                           placeholder="Введите название города (например: Нью-Йорк, Чикаго, Лос-Анджелес)" required>
-                </div>
-                <div class="col-md-4">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-search me-2"></i>Найти грузинские рестораны
-                    </button>
-                </div>
-            </div>
-            <small class="text-muted">
-                <i class="fas fa-info-circle me-1"></i>
-                Поиск производится через Google Places API
-            </small>
-        </form>
-    </div>
-</div>
-
-<!-- System Health & Notifications -->
-<div class="row mb-4">
-    <div class="col-md-8">
-        <!-- Recent Restaurants -->
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="fas fa-clock me-2"></i>
-                    Последние рестораны
-                </h5>
-                <a href="<?= base_url('admin/restaurants') ?>" class="btn btn-sm btn-outline-primary">
-                    <i class="fas fa-list me-1"></i>Все рестораны
-                </a>
-            </div>
-            <div class="card-body p-0">
-                <?php if (!empty($recent_restaurants)): ?>
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Название</th>
-                                    <th>Город</th>
-                                    <th>Рейтинг</th>
-                                    <th>Статус</th>
-                                    <th>Добавлен</th>
-                                    <th>Действия</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($recent_restaurants as $restaurant): ?>
-                                    <tr>
-                                        <td>
-                                            <strong><?= esc($restaurant['name']) ?></strong>
-                                            <?php if (!empty($restaurant['address'])): ?>
-                                                <br><small class="text-muted"><?= esc(substr($restaurant['address'], 0, 50)) ?>...</small>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td><?= esc($restaurant['city_name'] ?? 'Неизвестно') ?></td>
-                                        <td>
-                                            <?php if (!empty($restaurant['rating'])): ?>
-                                                <span class="badge bg-warning text-dark">
-                                                    <?= number_format($restaurant['rating'], 1) ?> ⭐
-                                                </span>
-                                            <?php else: ?>
-                                                <span class="text-muted">-</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td>
-                                            <?php if ($restaurant['is_active']): ?>
-                                                <span class="badge bg-success">Активен</span>
-                                            <?php else: ?>
-                                                <span class="badge bg-secondary">Неактивен</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td>
-                                            <?= !empty($restaurant['created_at']) ? date('d.m.Y', strtotime($restaurant['created_at'])) : '-' ?>
-                                        </td>
-                                        <td>
-                                            <a href="<?= base_url('admin/restaurants/edit/' . $restaurant['id']) ?>" 
-                                               class="btn btn-sm btn-outline-primary" title="Редактировать">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php else: ?>
-                    <div class="text-center py-5">
-                        <i class="fas fa-utensils fa-3x text-muted mb-3"></i>
-                        <h5>Ресторанов пока нет</h5>
-                        <p class="text-muted">Начните с поиска ресторанов в каком-нибудь городе!</p>
-                    </div>
-                <?php endif; ?>
             </div>
         </div>
     </div>
 
-    <div class="col-md-4">
-        <!-- System Alerts -->
-        <div class="card mb-3">
-            <div class="card-header">
-                <h6 class="card-title mb-0">
-                    <i class="fas fa-bell me-2"></i>Уведомления
-                </h6>
-            </div>
-            <div class="card-body">
-                <div class="list-group list-group-flush">
-                    <?php
-                    $alerts = [];
-                    
-                    // Проверяем различные условия
-                    if (($stats['total_restaurants'] - $restaurantsWithCoords) > 0) {
-                        $missingCoords = $stats['total_restaurants'] - $restaurantsWithCoords;
-                        $alerts[] = [
-                            'type' => 'warning',
-                            'icon' => 'fas fa-map-marker-alt',
-                            'message' => "{$missingCoords} ресторанов без координат",
-                            'action' => 'admin/geocode/restaurants'
-                        ];
-                    }
-                    
-                    if (!$sitemapExists) {
-                        $alerts[] = [
-                            'type' => 'info',
-                            'icon' => 'fas fa-sitemap',
-                            'message' => 'Sitemap не создан',
-                            'action' => 'admin/sitemap'
-                        ];
-                    } elseif (filemtime(FCPATH . '../writable/uploads/sitemap.xml') < strtotime('-7 days')) {
-                        $alerts[] = [
-                            'type' => 'warning',
-                            'icon' => 'fas fa-clock',
-                            'message' => 'Sitemap устарел (>7 дней)',
-                            'action' => 'admin/sitemap'
-                        ];
-                    }
-                    
-                    if ($stats['total_restaurants'] > 0 && $stats['active_restaurants'] < $stats['total_restaurants']) {
-                        $inactive = $stats['total_restaurants'] - $stats['active_restaurants'];
-                        $alerts[] = [
-                            'type' => 'secondary',
-                            'icon' => 'fas fa-eye-slash',
-                            'message' => "{$inactive} неактивных ресторанов",
-                            'action' => 'admin/restaurants?status=inactive'
-                        ];
-                    }
-                    ?>
-                    
-                    <?php if (empty($alerts)): ?>
-                        <div class="text-center py-3">
-                            <i class="fas fa-check-circle text-success fa-2x mb-2"></i>
-                            <p class="text-muted mb-0">Все в порядке!</p>
-                        </div>
-                    <?php else: ?>
-                        <?php foreach ($alerts as $alert): ?>
-                            <div class="list-group-item list-group-item-action border-0 px-0">
-                                <div class="d-flex align-items-center">
-                                    <div class="me-2">
-                                        <i class="<?= $alert['icon'] ?> text-<?= $alert['type'] ?>"></i>
-                                    </div>
-                                    <div class="flex-grow-1">
-                                        <small><?= $alert['message'] ?></small>
-                                    </div>
-                                    <div>
-                                        <a href="<?= base_url($alert['action']) ?>" class="btn btn-sm btn-outline-<?= $alert['type'] ?>">
-                                            <i class="fas fa-arrow-right"></i>
-                                        </a>
-                                    </div>
+    <!-- Проблемы требующие внимания -->
+    <?php 
+    $issues = [];
+    $noCoords = $stats['total_restaurants'] - $stats['restaurants_with_coordinates'];
+    $noPhotos = $stats['total_restaurants'] - $restaurantsWithPhotos;
+    $noPlaceId = $stats['total_restaurants'] - $restaurantsWithPlaceId;
+    $inactive = $stats['total_restaurants'] - $stats['active_restaurants'];
+    
+    if ($noCoords > 0) $issues[] = ['type' => 'warning', 'icon' => 'map-marker', 'text' => "Без координат: $noCoords"];
+    if ($noPhotos > 0) $issues[] = ['type' => 'info', 'icon' => 'images', 'text' => "Без фотографий: $noPhotos"];
+    if ($noPlaceId > 0) $issues[] = ['type' => 'secondary', 'icon' => 'google', 'text' => "Без Place ID: $noPlaceId", 'brand' => true];
+    if ($inactive > 0) $issues[] = ['type' => 'danger', 'icon' => 'eye-slash', 'text' => "Неактивные: $inactive"];
+    ?>
+
+    <?php if (!empty($issues)): ?>
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-left-warning shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Требует внимания
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <?php foreach ($issues as $issue): ?>
+                            <div class="col-md-6 col-lg-3 mb-2">
+                                <div class="alert alert-<?= $issue['type'] ?> mb-0 py-2">
+                                    <i class="fa<?= isset($issue['brand']) ? 'b' : 's' ?> fa-<?= $issue['icon'] ?> me-2"></i>
+                                    <?= $issue['text'] ?>
                                 </div>
                             </div>
                         <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- Последние рестораны и быстрые действия -->
+    <div class="row">
+        <!-- Последние рестораны -->
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock me-2"></i>
+                        Последние рестораны
+                    </h5>
+                    <a href="<?= base_url('admin/restaurants') ?>" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-list me-1"></i>Все рестораны
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (!empty($recent_restaurants)): ?>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Название</th>
+                                        <th>Город</th>
+                                        <th>Статус</th>
+                                        <th>Данные</th>
+                                        <th>Добавлен</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach (array_slice($recent_restaurants, 0, 8) as $restaurant): ?>
+                                        <tr>
+                                            <td>
+                                                <strong><?= esc($restaurant['name']) ?></strong>
+                                                <?php if (!empty($restaurant['address'])): ?>
+                                                    <br><small class="text-muted"><?= esc(substr($restaurant['address'], 0, 40)) ?>...</small>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td><?= esc($restaurant['city_name'] ?? 'Не указан') ?></td>
+                                            <td>
+                                                <?php if ($restaurant['is_active']): ?>
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-check"></i> Активен
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-secondary">
+                                                        <i class="fas fa-pause"></i> Неактивен
+                                                    </span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <div class="small d-flex gap-1">
+                                                    <?php if ($restaurant['latitude'] && $restaurant['longitude']): ?>
+                                                        <i class="fas fa-map-marker-alt text-success" title="Есть координаты"></i>
+                                                    <?php else: ?>
+                                                        <i class="fas fa-map-marker-alt text-muted" title="Нет координат"></i>
+                                                    <?php endif; ?>
+                                                    
+                                                    <?php if ($restaurant['google_place_id']): ?>
+                                                        <i class="fab fa-google text-success" title="Есть Place ID"></i>
+                                                    <?php else: ?>
+                                                        <i class="fab fa-google text-muted" title="Нет Place ID"></i>
+                                                    <?php endif; ?>
+                                                    
+                                                    <?php if ($restaurant['website']): ?>
+                                                        <i class="fas fa-globe text-info" title="Есть сайт"></i>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    <?= date('d.m.Y', strtotime($restaurant['created_at'])) ?>
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="<?= base_url('admin/restaurants/edit/' . $restaurant['id']) ?>" 
+                                                       class="btn btn-outline-primary btn-sm" title="Редактировать">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <?php if (!empty($restaurant['seo_url'])): ?>
+                                                        <a href="<?= base_url($restaurant['seo_url']) ?>" target="_blank"
+                                                           class="btn btn-outline-info btn-sm" title="Просмотр">
+                                                            <i class="fas fa-external-link-alt"></i>
+                                                        </a>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else: ?>
+                        <div class="text-center py-4">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">Нет недавно добавленных ресторанов</p>
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>
         </div>
 
-        <!-- Quick Stats -->
-        <div class="card">
-            <div class="card-header">
-                <h6 class="card-title mb-0">
-                    <i class="fas fa-chart-pie me-2"></i>Быстрая статистика
-                </h6>
+        <!-- Быстрые действия и SEO -->
+        <div class="col-lg-4">
+            <!-- Быстрые действия -->
+            <div class="card shadow mb-4">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-bolt me-2"></i>Быстрые действия
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="<?= base_url('admin/restaurants') ?>" class="btn btn-primary">
+                            <i class="fas fa-utensils me-2"></i>Управление ресторанами
+                        </a>
+                        <a href="<?= base_url('admin/cities') ?>" class="btn btn-info">
+                            <i class="fas fa-city me-2"></i>Управление городами
+                        </a>
+                        <a href="<?= base_url('admin/geocode') ?>" class="btn btn-warning">
+                            <i class="fas fa-map-marker-alt me-2"></i>Геокодирование
+                        </a>
+                        <a href="<?= base_url('admin/google-photos') ?>" class="btn btn-success">
+                            <i class="fab fa-google me-2"></i>Google Photos
+                        </a>
+                        <a href="<?= base_url('admin/sitemap') ?>" class="btn btn-secondary">
+                            <i class="fas fa-sitemap me-2"></i>Управление Sitemap
+                        </a>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="row g-2 text-center">
-                    <div class="col-6">
-                        <div class="border rounded p-2">
-                            <h5 class="text-primary mb-0"><?= number_format(($stats['active_restaurants'] / max($stats['total_restaurants'], 1)) * 100, 1) ?>%</h5>
-                            <small class="text-muted">Активных</small>
+
+            <!-- SEO Status -->
+            <div class="card shadow">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-search me-2"></i>SEO Status
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item d-flex justify-content-between align-items-center border-0 px-0">
+                            <span>
+                                <?php 
+                                $sitemapExists = file_exists(FCPATH . '../writable/uploads/sitemap.xml');
+                                ?>
+                                <i class="fas fa-sitemap me-2 text-<?= $sitemapExists ? 'success' : 'danger' ?>"></i>
+                                Sitemap.xml
+                            </span>
+                            <span class="badge bg-<?= $sitemapExists ? 'success' : 'danger' ?>">
+                                <?= $sitemapExists ? 'Есть' : 'Нет' ?>
+                            </span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between align-items-center border-0 px-0">
+                            <span>
+                                <?php 
+                                $robotsExists = file_exists(FCPATH . 'robots.txt');
+                                ?>
+                                <i class="fas fa-robot me-2 text-<?= $robotsExists ? 'success' : 'danger' ?>"></i>
+                                Robots.txt
+                            </span>
+                            <span class="badge bg-<?= $robotsExists ? 'success' : 'danger' ?>">
+                                <?= $robotsExists ? 'Есть' : 'Нет' ?>
+                            </span>
                         </div>
                     </div>
-                    <div class="col-6">
-                        <div class="border rounded p-2">
-                            <h5 class="text-success mb-0"><?= $geoPercentage ?>%</h5>
-                            <small class="text-muted">С координатами</small>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="border rounded p-2">
-                            <h5 class="text-info mb-0"><?= $stats['total_restaurants'] > 0 ? number_format($stats['total_restaurants'] / $stats['total_cities'], 1) : 0 ?></h5>
-                            <small class="text-muted">Ресторанов/город</small>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="border rounded p-2">
-                            <h5 class="text-warning mb-0"><?= $stats['recent_additions'] ?></h5>
-                            <small class="text-muted">За неделю</small>
-                        </div>
+                    
+                    <hr>
+                    
+                    <div class="d-grid gap-2">
+                        <?php if ($sitemapExists): ?>
+                            <a href="<?= base_url('sitemap.xml') ?>" target="_blank" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Просмотр Sitemap
+                            </a>
+                        <?php endif; ?>
+                        <a href="<?= base_url('map') ?>" target="_blank" class="btn btn-outline-info btn-sm">
+                            <i class="fas fa-map me-1"></i>Просмотр карты
+                        </a>
+                        <a href="<?= base_url() ?>" target="_blank" class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-globe me-1"></i>Перейти на сайт
+                        </a>
                     </div>
                 </div>
             </div>
@@ -473,43 +451,60 @@
     </div>
 </div>
 
-<?= $this->endSection() ?>
-
-<?= $this->section('styles') ?>
-.card {
-    border: none;
-    border-radius: 15px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-    transition: transform 0.3s ease;
-}
-.card:hover {
-    transform: translateY(-2px);
+<style>
+.border-left-primary {
+    border-left: 0.25rem solid #4e73df !important;
 }
 
-.list-group-item {
-    border: none !important;
-    padding: 0.5rem 0;
+.border-left-success {
+    border-left: 0.25rem solid #1cc88a !important;
 }
 
-.border {
-    border-color: #e9ecef !important;
+.border-left-info {
+    border-left: 0.25rem solid #36b9cc !important;
+}
+
+.border-left-warning {
+    border-left: 0.25rem solid #f6c23e !important;
+}
+
+.text-xs {
+    font-size: 0.7rem;
 }
 
 .progress {
-    border-radius: 10px;
+    height: 8px;
 }
 
-.btn {
-    border-radius: 8px;
+.font-weight-bold {
+    font-weight: 700 !important;
 }
 
-.quick-action-card {
-    transition: all 0.2s ease;
-    cursor: pointer;
+.text-gray-800 {
+    color: #5a5c69 !important;
 }
 
-.quick-action-card:hover {
-    background-color: var(--bs-light);
-    transform: translateY(-2px);
+.text-white-75 {
+    color: rgba(255, 255, 255, 0.75) !important;
 }
+
+.text-white-50 {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.card {
+    border: none;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+}
+
+.stretched-link::after {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+    content: "";
+}
+</style>
 <?= $this->endSection() ?>

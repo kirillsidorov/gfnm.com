@@ -2,284 +2,494 @@
 
 <?= $this->section('title') ?><?= $title ?><?= $this->endSection() ?>
 
-<?= $this->section('page_title') ?>
-<i class="fas fa-edit me-2"></i>Редактирование ресторана
-<?= $this->endSection() ?>
-
 <?= $this->section('content') ?>
 
-<!-- Header with Back Button -->
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h3 class="mb-0"><?= esc($restaurant['name']) ?></h3>
-        <small class="text-muted">ID: <?= $restaurant['id'] ?></small>
+<div class="container-fluid py-4">
+    <!-- Заголовок страницы -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-edit me-2 text-primary"></i>
+                <?= isset($restaurant) ? 'Редактировать ресторан' : 'Добавить ресторан' ?>
+            </h1>
+            <?php if (isset($restaurant)): ?>
+                <p class="text-muted mb-0">
+                    ID: <?= $restaurant['id'] ?> | 
+                    Создан: <?= date('d.m.Y H:i', strtotime($restaurant['created_at'])) ?>
+                    <?php if ($restaurant['updated_at'] !== $restaurant['created_at']): ?>
+                        | Обновлен: <?= date('d.m.Y H:i', strtotime($restaurant['updated_at'])) ?>
+                    <?php endif; ?>
+                </p>
+            <?php endif; ?>
+        </div>
+        <div class="btn-group">
+            <a href="<?= base_url('admin/restaurants') ?>" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Назад к списку
+            </a>
+            <?php if (isset($restaurant) && !empty($restaurant['seo_url'])): ?>
+                <a href="<?= base_url($restaurant['seo_url']) ?>" target="_blank" class="btn btn-outline-info">
+                    <i class="fas fa-external-link-alt me-1"></i>Просмотр
+                </a>
+            <?php endif; ?>
+        </div>
     </div>
-    <a href="<?= base_url('admin/restaurants') ?>" class="btn btn-secondary">
-        <i class="fas fa-arrow-left"></i> Back to Restaurants
-    </a>
-</div>
 
-<!-- Edit Form -->
-<div class="row">
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Restaurant Details</h5>
-            </div>
-            <div class="card-body">
-                <form method="POST" action="<?= current_url() ?>">
-                    <div class="row mb-3">
-                        <div class="col-md-8">
-                            <label for="name" class="form-label">Restaurant Name *</label>
-                            <input type="text" class="form-control" id="name" name="name" 
-                                   value="<?= esc($restaurant['name']) ?>" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="city_id" class="form-label">City *</label>
-                            <select class="form-select" id="city_id" name="city_id" required>
-                                <?php foreach ($cities as $city): ?>
-                                    <option value="<?= $city['id'] ?>" 
-                                            <?= ($city['id'] == $restaurant['city_id']) ? 'selected' : '' ?>>
-                                        <?= esc($city['name']) ?>
+    <div class="row">
+        <!-- Основная форма -->
+        <div class="col-lg-8">
+            <?php if (session()->getFlashdata('errors')): ?>
+                <div class="alert alert-danger alert-dismissible fade show">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong>Ошибки валидации:</strong>
+                    <ul class="mb-0 mt-2">
+                        <?php foreach (session()->getFlashdata('errors') as $error): ?>
+                            <li><?= esc($error) ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php endif; ?>
+
+            <form method="POST" id="restaurantForm">
+                <!-- Основная информация -->
+                <div class="card shadow mb-4">
+                    <div class="card-header">
+                        <h6 class="m-0 font-weight-bold text-primary">
+                            <i class="fas fa-info-circle me-2"></i>Основная информация
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <label for="name" class="form-label">
+                                    Название ресторана <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control" id="name" name="name" 
+                                       value="<?= old('name', $restaurant['name'] ?? '') ?>" 
+                                       placeholder="Введите название ресторана" required>
+                                <div class="form-text">Полное название ресторана</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="is_active" class="form-label">Статус</label>
+                                <select class="form-select" id="is_active" name="is_active" required>
+                                    <option value="1" <?= old('is_active', $restaurant['is_active'] ?? '1') == '1' ? 'selected' : '' ?>>
+                                        <i class="fas fa-check"></i> Активен
                                     </option>
-                                <?php endforeach; ?>
-                            </select>
+                                    <option value="0" <?= old('is_active', $restaurant['is_active'] ?? '1') == '0' ? 'selected' : '' ?>>
+                                        <i class="fas fa-pause"></i> Неактивен
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="city_id" class="form-label">
+                                    Город <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-select" id="city_id" name="city_id" required>
+                                    <option value="">Выберите город</option>
+                                    <?php foreach ($cities as $city): ?>
+                                        <option value="<?= $city['id'] ?>" 
+                                                data-state="<?= esc($city['state'] ?? '') ?>"
+                                                <?= old('city_id', $restaurant['city_id'] ?? '') == $city['id'] ? 'selected' : '' ?>>
+                                            <?= esc($city['name']) ?>
+                                            <?php if (!empty($city['state'])): ?>
+                                                , <?= esc($city['state']) ?>
+                                            <?php endif; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="rating" class="form-label">Рейтинг</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-star text-warning"></i></span>
+                                    <input type="number" class="form-control" id="rating" name="rating" 
+                                           min="0" max="5" step="0.1"
+                                           value="<?= old('rating', $restaurant['rating'] ?? '') ?>" 
+                                           placeholder="4.5">
+                                </div>
+                                <div class="form-text">От 0.0 до 5.0</div>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="price_level" class="form-label">Уровень цен</label>
+                                <select class="form-select" id="price_level" name="price_level">
+                                    <option value="0" <?= old('price_level', $restaurant['price_level'] ?? '0') == '0' ? 'selected' : '' ?>>
+                                        Не указан
+                                    </option>
+                                    <option value="1" <?= old('price_level', $restaurant['price_level'] ?? '0') == '1' ? 'selected' : '' ?>>
+                                        $ - Бюджетный
+                                    </option>
+                                    <option value="2" <?= old('price_level', $restaurant['price_level'] ?? '0') == '2' ? 'selected' : '' ?>>
+                                        $$ - Средний
+                                    </option>
+                                    <option value="3" <?= old('price_level', $restaurant['price_level'] ?? '0') == '3' ? 'selected' : '' ?>>
+                                        $$$ - Дорогой
+                                    </option>
+                                    <option value="4" <?= old('price_level', $restaurant['price_level'] ?? '0') == '4' ? 'selected' : '' ?>>
+                                        $$$$ - Очень дорогой
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Описание</label>
+                            <textarea class="form-control" id="description" name="description" rows="4" 
+                                      placeholder="Краткое описание ресторана, кухни, атмосферы..."><?= old('description', $restaurant['description'] ?? '') ?></textarea>
+                            <div class="form-text">
+                                Максимум 2000 символов. <span id="charCount" class="text-muted">0 символов</span>
+                            </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- NEW: SEO Fields Section -->
-                    <div class="card border-warning mb-3">
-                        <div class="card-header bg-warning bg-opacity-10">
-                            <h6 class="mb-0"><i class="fas fa-search"></i> SEO Settings</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label for="slug" class="form-label">Slug *</label>
+                <!-- SEO настройки -->
+                <div class="card shadow mb-4">
+                    <div class="card-header bg-warning bg-opacity-10">
+                        <h6 class="m-0 font-weight-bold text-warning">
+                            <i class="fas fa-search me-2"></i>SEO настройки
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="slug" class="form-label">
+                                    Slug <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
                                     <input type="text" class="form-control" id="slug" name="slug" 
-                                           value="<?= esc($restaurant['slug']) ?>" required>
-                                    <div class="form-text">
-                                        URL-friendly version of name (e.g., "aragvi-restaurant")
-                                        <br><small class="text-muted">Used in URLs: /restaurant/<strong>slug</strong></small>
-                                    </div>
+                                           value="<?= old('slug', $restaurant['slug'] ?? '') ?>" 
+                                           placeholder="restaurant-name" required>
+                                    <button type="button" class="btn btn-outline-secondary" id="generateSlug">
+                                        <i class="fas fa-magic"></i>
+                                    </button>
                                 </div>
-                                <div class="col-md-6">
-                                    <label for="seo_url" class="form-label">SEO URL</label>
+                                <div class="form-text">
+                                    URL-дружественное имя. Только строчные буквы, цифры и дефисы.
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="seo_url" class="form-label">SEO URL</label>
+                                <div class="input-group">
                                     <input type="text" class="form-control" id="seo_url" name="seo_url" 
-                                           value="<?= esc($restaurant['seo_url']) ?>">
-                                    <div class="form-text">
-                                        Full SEO URL path (e.g., "aragvi-restaurant-manhattan")
-                                        <br><small class="text-muted">Used for: <?= base_url() ?>/<strong>seo_url</strong></small>
-                                    </div>
+                                           value="<?= old('seo_url', $restaurant['seo_url'] ?? '') ?>" 
+                                           placeholder="restaurant-name-city">
+                                    <button type="button" class="btn btn-outline-info" id="generateSeoUrl">
+                                        <i class="fas fa-wand-magic-sparkles"></i>
+                                    </button>
                                 </div>
+                                <div class="form-text">
+                                    Полный SEO URL. Оставьте пустым для использования slug.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- URL Preview -->
+                        <div class="alert alert-info mb-0">
+                            <small>
+                                <i class="fas fa-info-circle me-1"></i>
+                                <strong>Предпросмотр URL:</strong><br>
+                                <span class="text-muted">Страница ресторана:</span> 
+                                <code id="restaurant-url-preview"><?= base_url() ?>/restaurant/<span id="slug-preview"><?= $restaurant['slug'] ?? 'slug' ?></span></code><br>
+                                <span class="text-muted">SEO URL:</span> 
+                                <code id="seo-url-preview"><?= base_url() ?>/<span id="seo-url-preview-text"><?= $restaurant['seo_url'] ?? 'seo-url' ?></span></code>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Контактная информация -->
+                <div class="card shadow mb-4">
+                    <div class="card-header">
+                        <h6 class="m-0 font-weight-bold text-primary">
+                            <i class="fas fa-address-book me-2"></i>Контактная информация
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Адрес</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-map-marker-alt"></i></span>
+                                <input type="text" class="form-control" id="address" name="address" 
+                                       value="<?= old('address', $restaurant['address'] ?? '') ?>" 
+                                       placeholder="Полный адрес ресторана">
+                                <button type="button" class="btn btn-outline-info" id="geocodeAddress" title="Получить координаты">
+                                    <i class="fas fa-map-pin"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="phone" class="form-label">Телефон</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                                    <input type="tel" class="form-control" id="phone" name="phone" 
+                                           value="<?= old('phone', $restaurant['phone'] ?? '') ?>" 
+                                           placeholder="+1 (555) 123-4567">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="website" class="form-label">Веб-сайт</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-globe"></i></span>
+                                    <input type="url" class="form-control" id="website" name="website" 
+                                           value="<?= old('website', $restaurant['website'] ?? '') ?>" 
+                                           placeholder="https://restaurant.com">
+                                    <?php if (!empty($restaurant['website'])): ?>
+                                        <a href="<?= esc($restaurant['website']) ?>" target="_blank" class="btn btn-outline-info">
+                                            <i class="fas fa-external-link-alt"></i>
+                                        </a>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="latitude" class="form-label">Широта</label>
+                                <input type="number" class="form-control" id="latitude" name="latitude" 
+                                       step="any" 
+                                       value="<?= old('latitude', $restaurant['latitude'] ?? '') ?>" 
+                                       placeholder="40.7580">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="longitude" class="form-label">Долгота</label>
+                                <input type="number" class="form-control" id="longitude" name="longitude" 
+                                       step="any"
+                                       value="<?= old('longitude', $restaurant['longitude'] ?? '') ?>" 
+                                       placeholder="-73.9855">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="google_place_id" class="form-label">Google Place ID</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fab fa-google"></i></span>
+                                <input type="text" class="form-control" id="google_place_id" name="google_place_id" 
+                                       value="<?= old('google_place_id', $restaurant['google_place_id'] ?? '') ?>" 
+                                       placeholder="ChIJN1t_tDeuEmsRUsoyG83frY4">
+                                <button type="button" class="btn btn-outline-success" id="findPlaceId" title="Найти Place ID">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                ID места в Google Places API для импорта фотографий и данных
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Кнопки действий -->
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-save me-1"></i>
+                                    <?= isset($restaurant) ? 'Обновить ресторан' : 'Создать ресторан' ?>
+                                </button>
+                                <a href="<?= base_url('admin/restaurants') ?>" class="btn btn-secondary ms-2">
+                                    <i class="fas fa-times me-1"></i>Отмена
+                                </a>
                             </div>
                             
-                            <div class="alert alert-info mb-0">
-                                <small>
-                                    <i class="fas fa-info-circle"></i> 
-                                    <strong>SEO URL Structure:</strong> Usually follows the pattern "restaurant-name-city" 
-                                    (e.g., "aragvi-restaurant-manhattan"). This creates user-friendly URLs that are better for SEO.
-                                </small>
+                            <?php if (isset($restaurant)): ?>
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-outline-info dropdown-toggle" data-bs-toggle="dropdown">
+                                        <i class="fas fa-tools me-1"></i>Дополнительно
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li>
+                                            <a class="dropdown-item" href="<?= base_url('admin/restaurants/' . $restaurant['id'] . '/photos') ?>">
+                                                <i class="fas fa-images me-1"></i>Управление фотографиями
+                                            </a>
+                                        </li>
+                                        <?php if (!empty($restaurant['google_place_id'])): ?>
+                                            <li>
+                                                <button type="button" class="dropdown-item" onclick="importGooglePhotos()">
+                                                    <i class="fab fa-google me-1"></i>Импорт фото из Google
+                                                </button>
+                                            </li>
+                                        <?php endif; ?>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <button type="button" class="dropdown-item text-danger" onclick="deleteRestaurant()">
+                                                <i class="fas fa-trash me-1"></i>Удалить ресторан
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Боковая панель -->
+        <div class="col-lg-4">
+            <?php if (isset($restaurant)): ?>
+                <!-- Информация о ресторане -->
+                <div class="card shadow mb-4">
+                    <div class="card-header">
+                        <h6 class="m-0 font-weight-bold text-primary">
+                            <i class="fas fa-info-circle me-2"></i>Информация
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center mb-3">
+                            <div class="col-4">
+                                <div class="h4 font-weight-bold text-primary"><?= $restaurant['id'] ?></div>
+                                <div class="text-xs text-uppercase text-muted">ID</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="h4 font-weight-bold text-success">
+                                    <?= $restaurant['rating'] ? number_format($restaurant['rating'], 1) : '—' ?>
+                                </div>
+                                <div class="text-xs text-uppercase text-muted">Рейтинг</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="h4 font-weight-bold text-info">
+                                    <?php 
+                                    try {
+                                        $photoModel = new \App\Models\RestaurantPhotoModel();
+                                        $photosCount = $photoModel->where('restaurant_id', $restaurant['id'])->countAllResults();
+                                        echo $photosCount;
+                                    } catch (Exception $e) {
+                                        echo '0';
+                                    }
+                                    ?>
+                                </div>
+                                <div class="text-xs text-uppercase text-muted">Фото</div>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="small">
+                            <div class="mb-2"><strong>Статус данных:</strong></div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <?php if ($restaurant['latitude'] && $restaurant['longitude']): ?>
+                                        <i class="fas fa-check text-success"></i> Координаты
+                                    <?php else: ?>
+                                        <i class="fas fa-times text-danger"></i> Координаты
+                                    <?php endif; ?>
+                                </div>
+                                <div class="col-6">
+                                    <?php if ($restaurant['google_place_id']): ?>
+                                        <i class="fas fa-check text-success"></i> Place ID
+                                    <?php else: ?>
+                                        <i class="fas fa-times text-danger"></i> Place ID
+                                    <?php endif; ?>
+                                </div>
+                                <div class="col-6">
+                                    <?php if ($restaurant['website']): ?>
+                                        <i class="fas fa-check text-success"></i> Веб-сайт
+                                    <?php else: ?>
+                                        <i class="fas fa-times text-danger"></i> Веб-сайт
+                                    <?php endif; ?>
+                                </div>
+                                <div class="col-6">
+                                    <?php if ($restaurant['phone']): ?>
+                                        <i class="fas fa-check text-success"></i> Телефон
+                                    <?php else: ?>
+                                        <i class="fas fa-times text-danger"></i> Телефон
+                                    <?php endif; ?>
+                                </div>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="mb-3">
-                        <label for="address" class="form-label">Address</label>
-                        <input type="text" class="form-control" id="address" name="address" 
-                               value="<?= esc($restaurant['address']) ?>">
+                <!-- Быстрые действия -->
+                <div class="card shadow mb-4">
+                    <div class="card-header">
+                        <h6 class="m-0 font-weight-bold text-primary">
+                            <i class="fas fa-bolt me-2"></i>Быстрые действия
+                        </h6>
                     </div>
-
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="phone" class="form-label">Phone</label>
-                            <input type="text" class="form-control" id="phone" name="phone" 
-                                   value="<?= esc($restaurant['phone']) ?>">
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-outline-primary" onclick="findOnMap()">
+                                <i class="fas fa-map-marker-alt me-1"></i>Найти на карте
+                            </button>
+                            <button type="button" class="btn btn-outline-info" onclick="validateData()">
+                                <i class="fas fa-check-circle me-1"></i>Проверить данные
+                            </button>
+                            <button type="button" class="btn btn-outline-success" onclick="generateFullSeo()">
+                                <i class="fas fa-magic me-1"></i>Генерировать SEO
+                            </button>
                         </div>
-                        <div class="col-md-6">
-                            <label for="website" class="form-label">Website</label>
-                            <input type="url" class="form-control" id="website" name="website" 
-                                   value="<?= esc($restaurant['website']) ?>">
-                        </div>
-                    </div>
-
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label for="rating" class="form-label">Rating</label>
-                            <input type="number" class="form-control" id="rating" name="rating" 
-                                   min="0" max="5" step="0.1" value="<?= $restaurant['rating'] ?>">
-                            <div class="form-text">Rating from 0.0 to 5.0</div>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="price_level" class="form-label">Price Level</label>
-                            <select class="form-select" id="price_level" name="price_level">
-                                <option value="0" <?= ($restaurant['price_level'] == 0) ? 'selected' : '' ?>>Not specified</option>
-                                <option value="1" <?= ($restaurant['price_level'] == 1) ? 'selected' : '' ?>>$ (Budget)</option>
-                                <option value="2" <?= ($restaurant['price_level'] == 2) ? 'selected' : '' ?>>$$ (Moderate)</option>
-                                <option value="3" <?= ($restaurant['price_level'] == 3) ? 'selected' : '' ?>>$$$ (Expensive)</option>
-                                <option value="4" <?= ($restaurant['price_level'] == 4) ? 'selected' : '' ?>>$$$$ (Very Expensive)</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="is_active" class="form-label">Status</label>
-                            <select class="form-select" id="is_active" name="is_active">
-                                <option value="1" <?= ($restaurant['is_active'] == 1) ? 'selected' : '' ?>>Active</option>
-                                <option value="0" <?= ($restaurant['is_active'] == 0) ? 'selected' : '' ?>>Inactive</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <label for="description" class="form-label">Description</label>
-                        <textarea class="form-control" id="description" name="description" rows="5"><?= esc($restaurant['description']) ?></textarea>
-                        <div class="form-text">Brief description of the restaurant and its cuisine</div>
-                    </div>
-
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Save Changes
-                        </button>
-                        <a href="<?= base_url('admin/restaurants') ?>" class="btn btn-secondary">
-                            <i class="fas fa-times"></i> Cancel
-                        </a>
-                        <button type="button" class="btn btn-outline-info" id="generateSeoUrl">
-                            <i class="fas fa-magic"></i> Generate SEO URL
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Restaurant Info Sidebar -->
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <h6 class="mb-0"><i class="fas fa-info-circle"></i> Restaurant Info</h6>
-            </div>
-            <div class="card-body">
-                <table class="table table-sm">
-                    <tr>
-                        <td><strong>ID:</strong></td>
-                        <td><?= $restaurant['id'] ?></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Current Slug:</strong></td>
-                        <td><code><?= esc($restaurant['slug']) ?></code></td>
-                    </tr>
-                    <?php if (!empty($restaurant['seo_url'])): ?>
-                    <tr>
-                        <td><strong>Current SEO URL:</strong></td>
-                        <td>
-                            <a href="<?= base_url($restaurant['seo_url']) ?>" target="_blank" class="text-decoration-none">
-                                <code><?= esc($restaurant['seo_url']) ?></code>
-                                <i class="fas fa-external-link-alt small"></i>
-                            </a>
-                        </td>
-                    </tr>
-                    <?php endif; ?>
-                    <?php if (!empty($restaurant['google_place_id'])): ?>
-                    <tr>
-                        <td><strong>Google Place ID:</strong></td>
-                        <td><code><?= esc($restaurant['google_place_id']) ?></code></td>
-                    </tr>
-                    <?php endif; ?>
-                    <tr>
-                        <td><strong>Created:</strong></td>
-                        <td><?= date('M j, Y H:i', strtotime($restaurant['created_at'])) ?></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Updated:</strong></td>
-                        <td><?= date('M j, Y H:i', strtotime($restaurant['updated_at'])) ?></td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-
-        <!-- URL Preview -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h6 class="mb-0"><i class="fas fa-link"></i> URL Preview</h6>
-            </div>
-            <div class="card-body">
-                <div class="mb-2">
-                    <small class="text-muted">Restaurant page URL:</small>
-                    <div class="bg-light p-2 rounded">
-                        <code id="restaurant-url-preview"><?= base_url('restaurant/' . $restaurant['slug']) ?></code>
                     </div>
                 </div>
-                <div id="seo-url-preview-container" <?= empty($restaurant['seo_url']) ? 'style="display:none"' : '' ?>>
-                    <small class="text-muted">SEO URL:</small>
-                    <div class="bg-light p-2 rounded">
-                        <code id="seo-url-preview"><?= base_url($restaurant['seo_url']) ?></code>
+            <?php else: ?>
+                <!-- Подсказки для нового ресторана -->
+                <div class="card shadow mb-4">
+                    <div class="card-header">
+                        <h6 class="m-0 font-weight-bold text-info">
+                            <i class="fas fa-lightbulb me-2"></i>Подсказки
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="small">
+                            <div class="mb-3">
+                                <strong>Обязательные поля:</strong>
+                                <ul class="mb-0 mt-1">
+                                    <li>Название ресторана</li>
+                                    <li>Город</li>
+                                    <li>Slug</li>
+                                </ul>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <strong>Рекомендуется:</strong>
+                                <ul class="mb-0 mt-1">
+                                    <li>Адрес и координаты</li>
+                                    <li>Телефон и веб-сайт</li>
+                                    <li>Рейтинг и уровень цен</li>
+                                    <li>Описание ресторана</li>
+                                </ul>
+                            </div>
+                            
+                            <div class="alert alert-info p-2 mb-0">
+                                <i class="fas fa-info-circle me-1"></i>
+                                После создания можно добавить Google Place ID и фотографии
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
+            <?php endif; ?>
 
-        <!-- Quick Actions -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h6 class="mb-0"><i class="fas fa-bolt"></i> Quick Actions</h6>
-            </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    <a href="<?= base_url('admin/restaurants/' . $restaurant['id'] . '/photos') ?>" 
-                       class="btn btn-outline-info btn-sm">
-                        <i class="fas fa-camera"></i> Manage Photos
-                    </a>
-                    
-                    <?php if (!empty($restaurant['seo_url'])): ?>
-                        <a href="<?= base_url($restaurant['seo_url']) ?>" target="_blank" class="btn btn-outline-primary btn-sm">
-                            <i class="fas fa-eye"></i> View on Site (SEO URL)
-                        </a>
-                    <?php endif; ?>
-                    
-                    <a href="<?= base_url('restaurant/' . $restaurant['slug']) ?>" target="_blank" class="btn btn-outline-primary btn-sm">
-                        <i class="fas fa-eye"></i> View on Site (Standard)
-                    </a>
-                    
-                    <?php if (!empty($restaurant['website'])): ?>
-                        <a href="<?= esc($restaurant['website']) ?>" target="_blank" class="btn btn-outline-info btn-sm">
-                            <i class="fas fa-globe"></i> Visit Website
-                        </a>
-                    <?php endif; ?>
-                    
-                    <?php if (!empty($restaurant['google_place_id'])): ?>
-                        <a href="https://www.google.com/maps/place/?q=place_id:<?= esc($restaurant['google_place_id']) ?>" 
-                           target="_blank" class="btn btn-outline-success btn-sm">
-                            <i class="fas fa-map-marker-alt"></i> View on Google Maps
-                        </a>
-                    <?php endif; ?>
-                    
-                    <hr>
-                    
-                    <a href="<?= base_url('admin/restaurants/delete/' . $restaurant['id']) ?>" 
-                       class="btn btn-outline-danger btn-sm"
-                       onclick="return confirm('Are you sure you want to delete this restaurant? This action cannot be undone.')">
-                        <i class="fas fa-trash"></i> Delete Restaurant
-                    </a>
+            <!-- Карта локации (если есть координаты) -->
+            <?php if (isset($restaurant) && $restaurant['latitude'] && $restaurant['longitude']): ?>
+                <div class="card shadow">
+                    <div class="card-header">
+                        <h6 class="m-0 font-weight-bold text-primary">
+                            <i class="fas fa-map me-2"></i>Расположение
+                        </h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="restaurantMap" style="height: 200px; background-color: #f8f9fa;">
+                            <div class="d-flex align-items-center justify-content-center h-100">
+                                <div class="text-center">
+                                    <i class="fas fa-map-marker-alt fa-2x text-muted mb-2"></i>
+                                    <div class="small text-muted">
+                                        <?= number_format($restaurant['latitude'], 6) ?>,<br>
+                                        <?= number_format($restaurant['longitude'], 6) ?>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="openInGoogleMaps()">
+                                        <i class="fas fa-external-link-alt me-1"></i>Google Maps
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- Tips -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h6 class="mb-0"><i class="fas fa-lightbulb"></i> SEO Tips</h6>
-            </div>
-            <div class="card-body">
-                <small class="text-muted">
-                    <ul class="mb-0 ps-3">
-                        <li><strong>Slug:</strong> Keep it short and descriptive (e.g., "aragvi-manhattan")</li>
-                        <li><strong>SEO URL:</strong> Follow pattern "restaurant-name-city" for best SEO</li>
-                        <li>Use hyphens, not underscores or spaces</li>
-                        <li>Keep URLs under 60 characters when possible</li>
-                        <li>Avoid special characters and numbers</li>
-                        <li>Make URLs readable and memorable</li>
-                    </ul>
-                </small>
-            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -287,275 +497,370 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<!-- SEO Helper utilities -->
-<script src="<?= base_url('assets/js/admin/seo-helper.js') ?>"></script>
-
 <script>
-// Конфигурация для текущей страницы
-const pageConfig = {
-    restaurantId: <?= $restaurant['id'] ?>,
-    baseUrl: '<?= base_url() ?>',
-    cities: <?= json_encode($cities) ?>
-};
-
-// Auto-format phone number
-document.getElementById('phone').addEventListener('input', function(e) {
-    let value = e.target.value.replace(/\D/g, '');
-    if (value.length >= 6) {
-        value = `(${value.substring(0,3)}) ${value.substring(3,6)}-${value.substring(6,10)}`;
-    } else if (value.length >= 3) {
-        value = `(${value.substring(0,3)}) ${value.substring(3)}`;
-    }
-    e.target.value = value;
-});
-
-// Validate rating
-document.getElementById('rating').addEventListener('input', function(e) {
-    const value = parseFloat(e.target.value);
-    if (value > 5) e.target.value = 5;
-    if (value < 0) e.target.value = 0;
-});
-
-// Auto-update description based on name
-document.getElementById('name').addEventListener('input', function(e) {
-    const description = document.getElementById('description');
-    if (!description.value.trim()) {
-        const name = e.target.value;
-        if (name) {
-            description.value = `Authentic Georgian restaurant ${name} serving traditional Georgian dishes like khachapuri, khinkali, and other delicious Georgian cuisine.`;
-        }
-    }
-});
-
-// Основные переменные для SEO функций
-const baseUrl = pageConfig.baseUrl;
-const restaurantId = pageConfig.restaurantId;
-let slugCheckTimeout;
-let seoUrlCheckTimeout;
-
-// Slug generation and validation
-function generateSlug(text) {
-    return text
-        .toLowerCase()
-        .trim()
-        .replace(/[^\w\s-]/g, '') // Remove special characters
-        .replace(/\s+/g, '-') // Replace spaces with hyphens
-        .replace(/-+/g, '-') // Replace multiple hyphens with single
-        .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
-}
-
-// Auto-generate slug from name (без проверки уникальности)
-document.getElementById('name').addEventListener('input', function(e) {
-    const slugField = document.getElementById('slug');
-    if (!slugField.dataset.manual) {
-        slugField.value = generateSlug(e.target.value);
-        updateUrlPreviews();
-        // Убрали checkSlugAvailability - slug уникальность не проверяем
-    }
-});
-
-// Mark slug as manually edited (без проверки уникальности)
-document.getElementById('slug').addEventListener('input', function(e) {
-    e.target.dataset.manual = 'true';
-    const newSlug = generateSlug(e.target.value);
-    e.target.value = newSlug;
-    updateUrlPreviews();
-    
-    // Убрали проверку уникальности slug
-});
-
-// Auto-generate SEO URL
-document.getElementById('generateSeoUrl').addEventListener('click', function() {
-    const name = document.getElementById('name').value;
-    const citySelect = document.getElementById('city_id');
-    const cityName = citySelect.options[citySelect.selectedIndex].text;
-    
-    if (name && cityName) {
-        const restaurantSlug = generateSlug(name);
-        const citySlug = generateSlug(cityName);
-        const seoUrl = `${restaurantSlug}-restaurant-${citySlug}`;
+$(document).ready(function() {
+    // Счетчик символов для описания
+    $('#description').on('input', function() {
+        const length = $(this).val().length;
+        const maxLength = 2000;
+        const remaining = maxLength - length;
         
-        document.getElementById('seo_url').value = seoUrl;
-        updateUrlPreviews();
-        checkSeoUrlAvailability(seoUrl);
-    } else {
-        showAlert('Please fill in restaurant name and select city first', 'warning');
-    }
-});
-
-// Update SEO URL on manual input
-document.getElementById('seo_url').addEventListener('input', function(e) {
-    const newSeoUrl = generateSlug(e.target.value);
-    e.target.value = newSeoUrl;
-    updateUrlPreviews();
-    
-    // Debounced availability check
-    clearTimeout(seoUrlCheckTimeout);
-    if (newSeoUrl) {
-        seoUrlCheckTimeout = setTimeout(() => {
-            checkSeoUrlAvailability(newSeoUrl);
-        }, 500);
-    } else {
-        clearValidationMessage('seo_url');
-    }
-});
-
-// Update URL previews
-function updateUrlPreviews() {
-    const slug = document.getElementById('slug').value;
-    const seoUrl = document.getElementById('seo_url').value;
-    
-    // Update restaurant URL preview
-    document.getElementById('restaurant-url-preview').textContent = `${baseUrl}restaurant/${slug}`;
-    
-    // Update SEO URL preview
-    const seoUrlContainer = document.getElementById('seo-url-preview-container');
-    const seoUrlPreview = document.getElementById('seo-url-preview');
-    
-    if (seoUrl) {
-        seoUrlPreview.textContent = `${baseUrl}${seoUrl}`;
-        seoUrlContainer.style.display = 'block';
-    } else {
-        seoUrlContainer.style.display = 'none';
-    }
-}
-
-// Убираем функцию checkSlugAvailability - не нужна
-
-// Check SEO URL availability via AJAX (оставляем только эту проверку)
-function checkSeoUrlAvailability(seoUrl) {
-    if (!seoUrl) {
-        clearValidationMessage('seo_url');
-        return;
-    }
-    
-    showValidationMessage('seo_url', 'Checking availability...', 'info');
-    
-    fetch(`${baseUrl}admin/restaurants/check-seo-url-availability`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: `seo_url=${encodeURIComponent(seoUrl)}&exclude_id=${restaurantId}`
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.available) {
-            showValidationMessage('seo_url', data.message, 'success');
-        } else {
-            showValidationMessage('seo_url', data.message, 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error checking SEO URL availability:', error);
-        showValidationMessage('seo_url', 'Error checking availability', 'error');
+        let color = 'text-muted';
+        if (remaining < 100) color = 'text-danger';
+        else if (remaining < 200) color = 'text-warning';
+        
+        $('#charCount').removeClass('text-muted text-warning text-danger').addClass(color);
+        $('#charCount').text(`${length} символов (осталось: ${remaining})`);
     });
+    
+    // Инициализация счетчика
+    $('#description').trigger('input');
+    
+    // Автогенерация slug из названия
+    $('#name').on('input', function() {
+        if (!$('#slug').data('manual')) {
+            const slug = generateSlug($(this).val());
+            $('#slug').val(slug);
+            updatePreviews();
+        }
+    });
+    
+    // Отметить slug как ручной при редактировании
+    $('#slug').on('input', function() {
+        $(this).data('manual', true);
+        updatePreviews();
+    });
+    
+    // Обновление SEO URL превью
+    $('#seo_url').on('input', updatePreviews);
+    
+    // Кнопка генерации slug
+    $('#generateSlug').on('click', function() {
+        const name = $('#name').val();
+        if (name) {
+            const slug = generateSlug(name);
+            $('#slug').val(slug).data('manual', false);
+            updatePreviews();
+        } else {
+            alert('Сначала введите название ресторана');
+        }
+    });
+    
+    // Кнопка генерации SEO URL
+    $('#generateSeoUrl').on('click', function() {
+        const name = $('#name').val();
+        const citySelect = $('#city_id option:selected');
+        
+        if (!name) {
+            alert('Сначала введите название ресторана');
+            return;
+        }
+        
+        if (!citySelect.val()) {
+            alert('Сначала выберите город');
+            return;
+        }
+        
+        const cityName = citySelect.text().split(',')[0].trim(); // Берем только название города
+        const seoUrl = generateSlug(name + ' ' + cityName);
+        $('#seo_url').val(seoUrl);
+        updatePreviews();
+    });
+    
+    // Геокодирование адреса
+    $('#geocodeAddress').on('click', function() {
+        const address = $('#address').val();
+        if (!address) {
+            alert('Введите адрес для геокодирования');
+            return;
+        }
+        
+        const button = $(this);
+        const originalHtml = button.html();
+        button.html('<i class="fas fa-spinner fa-spin"></i>').prop('disabled', true);
+        
+        // Простое геокодирование через Google Maps API
+        geocodeAddress(address, function(lat, lng) {
+            $('#latitude').val(lat);
+            $('#longitude').val(lng);
+            showAlert('success', 'Координаты получены успешно');
+            button.html(originalHtml).prop('disabled', false);
+        }, function(error) {
+            showAlert('danger', 'Ошибка геокодирования: ' + error);
+            button.html(originalHtml).prop('disabled', false);
+        });
+    });
+    
+    // Поиск Google Place ID
+    $('#findPlaceId').on('click', function() {
+        const name = $('#name').val();
+        const address = $('#address').val();
+        
+        if (!name && !address) {
+            alert('Введите название или адрес ресторана');
+            return;
+        }
+        
+        const button = $(this);
+        const originalHtml = button.html();
+        button.html('<i class="fas fa-spinner fa-spin"></i>').prop('disabled', true);
+        
+        // Поиск Place ID (требует реализации на бэкенде)
+        findPlaceId(name, address, function(placeId) {
+            $('#google_place_id').val(placeId);
+            showAlert('success', 'Google Place ID найден');
+            button.html(originalHtml).prop('disabled', false);
+        }, function(error) {
+            showAlert('warning', 'Place ID не найден: ' + error);
+            button.html(originalHtml).prop('disabled', false);
+        });
+    });
+    
+    // Валидация координат
+    $('#latitude, #longitude').on('input', function() {
+        const lat = parseFloat($('#latitude').val());
+        const lng = parseFloat($('#longitude').val());
+        
+        if (lat && (lat < -90 || lat > 90)) {
+            showAlert('warning', 'Широта должна быть от -90 до 90');
+        }
+        
+        if (lng && (lng < -180 || lng > 180)) {
+            showAlert('warning', 'Долгота должна быть от -180 до 180');
+        }
+    });
+    
+    // Проверка формата Google Place ID
+    $('#google_place_id').on('input', function() {
+        const placeId = $(this).val();
+        if (placeId && !placeId.match(/^ChIJ/)) {
+            $(this).addClass('is-warning');
+            showAlert('info', 'Google Place ID обычно начинается с "ChIJ"');
+        } else {
+            $(this).removeClass('is-warning');
+        }
+    });
+    
+    // Валидация формы перед отправкой
+    $('#restaurantForm').on('submit', function(e) {
+        const name = $('#name').val().trim();
+        const slug = $('#slug').val().trim();
+        const cityId = $('#city_id').val();
+        
+        if (!name) {
+            e.preventDefault();
+            showAlert('danger', 'Введите название ресторана');
+            $('#name').focus();
+            return false;
+        }
+        
+        if (!slug) {
+            e.preventDefault();
+            showAlert('danger', 'Введите slug');
+            $('#slug').focus();
+            return false;
+        }
+        
+        if (!cityId) {
+            e.preventDefault();
+            showAlert('danger', 'Выберите город');
+            $('#city_id').focus();
+            return false;
+        }
+        
+        // Проверка корректности slug
+        if (!slug.match(/^[a-z0-9-]+$/)) {
+            e.preventDefault();
+            showAlert('danger', 'Slug может содержать только строчные буквы, цифры и дефисы');
+            $('#slug').focus();
+            return false;
+        }
+        
+        return true;
+    });
+});
+
+// Генерация slug из текста
+function generateSlug(text) {
+    return text.toLowerCase()
+               .replace(/[^a-z0-9\s-]/g, '')
+               .replace(/\s+/g, '-')
+               .replace(/-+/g, '-')
+               .replace(/^-|-$/g, '');
 }
 
-// Show validation message
-function showValidationMessage(fieldId, message, type) {
-    const field = document.getElementById(fieldId);
-    let messageDiv = field.parentNode.querySelector('.validation-message');
+// Обновление превью URL
+function updatePreviews() {
+    const slug = $('#slug').val() || 'slug';
+    const seoUrl = $('#seo_url').val() || slug;
     
-    if (!messageDiv) {
-        messageDiv = document.createElement('div');
-        messageDiv.className = 'validation-message form-text';
-        field.parentNode.appendChild(messageDiv);
-    }
-    
-    // Remove existing classes
-    messageDiv.className = 'validation-message form-text';
-    
-    // Add type-specific class
-    switch (type) {
-        case 'success':
-            messageDiv.classList.add('text-success');
-            field.classList.remove('is-invalid');
-            field.classList.add('is-valid');
-            break;
-        case 'error':
-            messageDiv.classList.add('text-danger');
-            field.classList.remove('is-valid');
-            field.classList.add('is-invalid');
-            break;
-        case 'info':
-            messageDiv.classList.add('text-info');
-            field.classList.remove('is-valid', 'is-invalid');
-            break;
-        default:
-            field.classList.remove('is-valid', 'is-invalid');
-    }
-    
-    messageDiv.textContent = message;
+    $('#slug-preview').text(slug);
+    $('#seo-url-preview-text').text(seoUrl);
 }
 
-// Clear validation message
-function clearValidationMessage(fieldId) {
-    const field = document.getElementById(fieldId);
-    const messageDiv = field.parentNode.querySelector('.validation-message');
-    
-    if (messageDiv) {
-        messageDiv.remove();
-    }
-    
-    field.classList.remove('is-valid', 'is-invalid');
+// Геокодирование адреса
+function geocodeAddress(address, successCallback, errorCallback) {
+    // Здесь должен быть запрос к Google Geocoding API
+    // Пока заглушка
+    setTimeout(() => {
+        errorCallback('Геокодирование не настроено');
+    }, 1000);
 }
 
-// Show alert message
-function showAlert(message, type = 'info') {
-    // Create alert element
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-    alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+// Поиск Google Place ID
+function findPlaceId(name, address, successCallback, errorCallback) {
+    // Здесь должен быть запрос к Google Places API
+    // Пока заглушка
+    setTimeout(() => {
+        errorCallback('Поиск Place ID не настроен');
+    }, 1000);
+}
+
+// Боковые функции
+function findOnMap() {
+    const lat = $('#latitude').val();
+    const lng = $('#longitude').val();
+    const name = $('#name').val();
+    
+    if (lat && lng) {
+        const url = `https://www.google.com/maps/@${lat},${lng},15z`;
+        window.open(url, '_blank');
+    } else if (name) {
+        const url = `https://www.google.com/maps/search/${encodeURIComponent(name)}`;
+        window.open(url, '_blank');
+    } else {
+        showAlert('warning', 'Укажите координаты или название для поиска на карте');
+    }
+}
+
+function openInGoogleMaps() {
+    <?php if (isset($restaurant) && $restaurant['latitude'] && $restaurant['longitude']): ?>
+        const url = `https://www.google.com/maps/@<?= $restaurant['latitude'] ?>,<?= $restaurant['longitude'] ?>,15z`;
+        window.open(url, '_blank');
+    <?php endif; ?>
+}
+
+function validateData() {
+    const issues = [];
+    
+    if (!$('#latitude').val() || !$('#longitude').val()) {
+        issues.push('Нет координат');
+    }
+    
+    if (!$('#google_place_id').val()) {
+        issues.push('Нет Google Place ID');
+    }
+    
+    if (!$('#phone').val()) {
+        issues.push('Нет телефона');
+    }
+    
+    if (!$('#website').val()) {
+        issues.push('Нет веб-сайта');
+    }
+    
+    if (!$('#description').val()) {
+        issues.push('Нет описания');
+    }
+    
+    if (issues.length === 0) {
+        showAlert('success', 'Все данные заполнены корректно!');
+    } else {
+        showAlert('warning', 'Недостающие данные: ' + issues.join(', '));
+    }
+}
+
+function generateFullSeo() {
+    $('#generateSlug').click();
+    setTimeout(() => {
+        $('#generateSeoUrl').click();
+        showAlert('success', 'SEO данные сгенерированы');
+    }, 100);
+}
+
+function importGooglePhotos() {
+    <?php if (isset($restaurant)): ?>
+        const placeId = $('#google_place_id').val();
+        if (!placeId) {
+            showAlert('warning', 'Сначала добавьте Google Place ID');
+            return;
+        }
+        
+        if (confirm('Импортировать фотографии из Google Places?')) {
+            $.ajax({
+                url: '<?= base_url('admin/restaurants/' . $restaurant['id'] . '/import-google-photos') ?>',
+                method: 'POST',
+                dataType: 'json',
+                beforeSend: function() {
+                    showAlert('info', 'Импорт фотографий...');
+                },
+                success: function(response) {
+                    if (response.success) {
+                        showAlert('success', response.message);
+                    } else {
+                        showAlert('danger', response.message);
+                    }
+                },
+                error: function() {
+                    showAlert('danger', 'Ошибка импорта фотографий');
+                }
+            });
+        }
+    <?php endif; ?>
+}
+
+function deleteRestaurant() {
+    <?php if (isset($restaurant)): ?>
+        if (confirm('Вы уверены, что хотите удалить ресторан "<?= esc($restaurant['name']) ?>"?\n\nЭто действие нельзя отменить.')) {
+            $.ajax({
+                url: '<?= base_url('admin/restaurants/delete/' . $restaurant['id']) ?>',
+                method: 'DELETE',
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        showAlert('success', 'Ресторан удален');
+                        setTimeout(() => {
+                            window.location.href = '<?= base_url('admin/restaurants') ?>';
+                        }, 1500);
+                    } else {
+                        showAlert('danger', response.message);
+                    }
+                },
+                error: function() {
+                    showAlert('danger', 'Ошибка удаления ресторана');
+                }
+            });
+        }
+    <?php endif; ?>
+}
+
+// Показ уведомлений
+function showAlert(type, message) {
+    const alertClass = `alert-${type}`;
+    const iconClass = type === 'success' ? 'check-circle' : 
+                     type === 'danger' ? 'exclamation-circle' : 
+                     type === 'warning' ? 'exclamation-triangle' : 'info-circle';
+    
+    const alert = `
+        <div class="alert ${alertClass} alert-dismissible fade show position-fixed" 
+             style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+            <i class="fas fa-${iconClass} me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
     `;
     
-    // Insert at top of form
-    const form = document.querySelector('form');
-    form.insertBefore(alertDiv, form.firstChild);
+    $('body').append(alert);
     
-    // Auto-dismiss after 5 seconds
-    setTimeout(() => {
-        if (alertDiv.parentNode) {
-            alertDiv.remove();
-        }
+    // Автоматическое скрытие через 5 секунд
+    setTimeout(function() {
+        $('.alert').last().fadeOut('slow', function() {
+            $(this).remove();
+        });
     }, 5000);
 }
 
-// Form submission validation (убираем проверку slug)
-document.querySelector('form').addEventListener('submit', function(e) {
-    const seoUrlField = document.getElementById('seo_url');
-    
-    // Проверяем только SEO URL на ошибки валидации
-    if (seoUrlField.classList.contains('is-invalid')) {
-        e.preventDefault();
-        showAlert('Please fix SEO URL validation errors before submitting', 'danger');
-        return false;
-    }
-});
-
-// Initialize URL previews
-updateUrlPreviews();
-
-// City change handler for auto-generating SEO URL
-document.getElementById('city_id').addEventListener('change', function() {
-    const seoUrlField = document.getElementById('seo_url');
-    if (!seoUrlField.dataset.manual) {
-        // Auto-regenerate SEO URL if it wasn't manually set
-        document.getElementById('generateSeoUrl').click();
-    }
-});
-
-// Initialize validation for existing values (только SEO URL)
-document.addEventListener('DOMContentLoaded', function() {
-    const seoUrlField = document.getElementById('seo_url');
-    
-    // Проверяем только SEO URL при загрузке
-    if (seoUrlField.value) {
-        checkSeoUrlAvailability(seoUrlField.value);
-    }
-});
+// Инициализация превью при загрузке
+updatePreviews();
 </script>
 <?= $this->endSection() ?>

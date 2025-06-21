@@ -2032,5 +2032,52 @@ private function processCsvFile($file)
             ->setHeader('Content-Type', 'application/xml; charset=utf-8')
             ->setBody(file_get_contents($sitemapPath));
     }
+/**
+ * AJAX геокодирование адреса
+ */
+public function geocodeAddress()
+{
+    $address = $this->request->getPost('address');
+    
+    if (!$address) {
+        return $this->response->setJSON([
+            'success' => false,
+            'message' => 'Адрес не указан'
+        ]);
+    }
+    
+    // Здесь интеграция с Google Geocoding API
+    // Пока возвращаем заглушку
+    return $this->response->setJSON([
+        'success' => false,
+        'message' => 'Геокодирование не настроено'
+    ]);
+}
 
+/**
+ * Поиск Google Place ID
+ */
+public function findPlaceId()
+{
+    $name = $this->request->getPost('name');
+    $address = $this->request->getPost('address');
+    
+    // Здесь интеграция с Google Places API
+    return $this->response->setJSON([
+        'success' => false,
+        'message' => 'Поиск Place ID не настроен'
+    ]);
+}
+
+/**
+ * Импорт фотографий из Google Places
+ */
+public function importGooglePhotos($restaurantId)
+{
+    // Ваша существующая логика импорта фото
+    return $this->response->setJSON([
+        'success' => true,
+        'message' => 'Функция импорта уже реализована'
+    ]);
+}
 }
