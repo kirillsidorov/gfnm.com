@@ -13,9 +13,6 @@ $routes->get('about', 'Pages::index');
 $routes->get('privacy', 'Pages::privacy');
 $routes->get('terms', 'Pages::terms');
 
-
-//$routes->get('restaurant/(:segment)', 'RestaurantsEnhance::view/$1');
-
 // Bug Report routes
 $routes->get('bug-report', 'BugReport::index');
 $routes->post('bug-report/submit', 'BugReport::submit');
@@ -78,7 +75,7 @@ $routes->get('new-york-city', 'RestaurantsEnhance::newYorkCity');
 $routes->get('nyc', 'RestaurantsEnhance::newYorkCity');
 
 // ==========================================
-// ADMIN ROUTES - Остаются без изменений
+// ADMIN ROUTES
 // ==========================================
 
 // Публичный вход в админку
@@ -109,15 +106,19 @@ $routes->group('admin', ['filter' => 'adminauth'], function($routes) {
     $routes->get('restaurants/(:num)/preview-google-photos', 'Admin::previewGooglePhotos/$1');
     $routes->post('restaurants/(:num)/import-google-photos', 'Admin::importGooglePhotos/$1');
     $routes->post('restaurants/update-from-dataforseo/(:num)', 'Admin::updateFromDataForSeo/$1');
-
+    
     // AJAX методы для SEO полей (только SEO URL проверка)
     $routes->post('restaurants/check-seo-url-availability', 'Admin::checkSeoUrlAvailability');
     $routes->post('restaurants/generate-slug', 'Admin::generateSlug');
     $routes->post('restaurants/generate-missing-seo-urls', 'Admin::generateMissingSeoUrls');
 
 
-    $routes->post('restaurants/update-from-dataforseo/(:num)', 'Admin::updateFromDataForSEO/$1');
-
+    $routes->get('restaurants/stats', 'RestaurantUpdaterController::getRestaurantsStats');
+    $routes->get('restaurants/updater', 'RestaurantUpdaterController::updaterPage');
+    $routes->post('restaurants/update-all', 'RestaurantUpdaterController::updateAllRestaurants');
+    $routes->post('restaurants/update/(:num)', 'RestaurantUpdaterController::updateRestaurant/$1');
+    $routes->post('restaurants/update', 'RestaurantUpdaterController::updateRestaurant');
+    $routes->post('restaurants/update-batch', 'RestaurantUpdaterController::updateRestaurantsBatch');
 
     // ===== УПРАВЛЕНИЕ ФОТОГРАФИЯМИ =====
     $routes->match(['get', 'post'], 'restaurants/(:num)/photos', 'Restaurants::uploadPhoto/$1');
@@ -221,43 +222,10 @@ $routes->post('/api/map/nearby', 'MapController::searchNearby');
 // ===== SITEMAP И SEO =====
 $routes->get('sitemap.xml', 'Admin::publicSitemap');
 
-// 404 Override
-//$routes->set404Override('Errors::show404');
-
-// API Testing routes
-$routes->group('api-test', function($routes) {
-    $routes->get('/', 'ApiTestController::testDataForSEO');
-    $routes->get('location/(:alpha)', 'ApiTestController::testDataForSEO/$1');
-    $routes->get('download/(:any)', 'ApiTestController::downloadTestResult/$1');
-    $routes->post('custom-search', 'ApiTestController::customSearch');
-});
-
-// DataForSEO Integration routes (для основного функционала)
-$routes->group('restaurants', function($routes) {
-    $routes->get('search', 'DataForSeoController::searchGeorgianRestaurants');
-    $routes->post('search/nearby', 'DataForSeoController::searchNearby');
-    $routes->get('details/(:any)', 'DataForSeoController::getRestaurantDetails/$1');
-});
-
-// API endpoints для AJAX запросов
-$routes->group('api/v1', function($routes) {
-    $routes->post('restaurants/search', 'Api\RestaurantApiController::search');
-    $routes->get('restaurants/(:num)', 'Api\RestaurantApiController::show/$1');
-    $routes->post('restaurants/import', 'Api\RestaurantApiController::importFromDataForSEO');
-});
-
 // Простой API тест
 $routes->get('simple-api-test', 'SimpleApiTestController::index');
 $routes->get('simple-api-test/(:alpha)', 'SimpleApiTestController::index/$1');
 $routes->get('simple-api-test/download/(:any)', 'SimpleApiTestController::download/$1');
 
-// В app/Config/Routes.php
-$routes->group('import-test', function($routes) {
-    $routes->get('/', 'ImportTestController::index');
-    $routes->post('import-chama-mama', 'ImportTestController::importChamaMama');
-    $routes->get('view-imported', 'ImportTestController::viewImported');
-    $routes->get('test-attribute-search', 'ImportTestController::testAttributeSearch');
-    $routes->get('attribute-stats', 'ImportTestController::attributeStats');
-});
 // ВАЖНО: Универсальный обработчик остается в конце
 $routes->get('(:segment)', 'Restaurants::bySeoUrl/$1');

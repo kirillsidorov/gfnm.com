@@ -154,7 +154,14 @@
                                 <i class="fas fa-external-link-alt ms-1 small"></i>
                             </a>
                         </li>
-                        
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= base_url('admin/restaurants/updater') ?>" target="_blank">
+                                <i class="fas fa-flask me-2 text-info"></i>
+                                Google Place API Update
+                                <i class="fas fa-external-link-alt ms-1 small"></i>
+                            </a>
+                        </li>
+
                         <li class="nav-item">
                             <a class="nav-link" href="<?= base_url('admin/clear-cache') ?>">
                                 <i class="fas fa-memory text-warning me-2"></i>
