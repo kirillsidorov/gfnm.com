@@ -502,8 +502,82 @@ echo "<!-- DEBUG: MainPhoto isset: " . (isset($mainPhoto) ? 'YES' : 'NO') . " --
                 </div>
                 <?php endif; ?>
 
-                <!-- People Also Search -->
-                <?php if (!empty($restaurant['people_also_search']) && is_array($restaurant['people_also_search'])): ?>
+                <!-- People Also Search - ИСПРАВЛЕННАЯ ВЕРСИЯ -->
+                <?php 
+                // Правильно обрабатываем people_also_search
+                $relatedSearches = [];
+
+                // Если данные есть в restaurant_relations таблице - берем оттуда
+                if (isset($restaurant['id'])) {
+                    $db = \Config\Database::connect();
+                    $relatedRestaurants = $db->table('restaurant_relations')
+                                            ->where('restaurant_id', $restaurant['id'])
+                                            ->where('relation_type', 'people_also_search')
+                                            ->where('related_name !=', '')
+                                            ->limit(5)
+                                            ->get()
+                                            ->getResultArray();
+                    
+                    foreach ($relatedRestaurants as $related) {
+                        if (!empty($related['related_name']) && $related['related_name'] !== '') {
+                            $relatedSearches[] = [
+                                'name' => $related['related_name'],
+                                'rating' => $related['related_rating'],
+                                'rating_count' => $related['related_rating_count'],
+                                'type' => 'restaurant'
+                            ];
+                        }
+                    }
+                }
+
+                // Если нет данных из таблицы связей, пробуем из JSON поля
+                if (empty($relatedSearches) && !empty($restaurant['people_also_search'])) {
+                    $peopleAlsoSearchData = $restaurant['people_also_search'];
+                    
+                    // Если это строка JSON - декодируем
+                    if (is_string($peopleAlsoSearchData)) {
+                        $peopleAlsoSearchData = json_decode($peopleAlsoSearchData, true);
+                    }
+                    
+                    if (is_array($peopleAlsoSearchData)) {
+                        foreach ($peopleAlsoSearchData as $search) {
+                            if (is_array($search) && !empty($search['title'])) {
+                                $relatedSearches[] = [
+                                    'name' => $search['title'],
+                                    'rating' => $search['rating']['value'] ?? null,
+                                    'rating_count' => $search['rating']['votes_count'] ?? null,
+                                    'type' => 'restaurant'
+                                ];
+                            }
+                        }
+                    }
+                }
+
+                // Если всё равно нет данных, добавляем общие поисковые запросы
+                if (empty($relatedSearches)) {
+                    $cityName = $restaurant['city_name'] ?? 'your area';
+                    $relatedSearches = [
+                        [
+                            'name' => 'Georgian restaurants in ' . $cityName,
+                            'type' => 'search'
+                        ],
+                        [
+                            'name' => 'Khachapuri near me',
+                            'type' => 'search'
+                        ],
+                        [
+                            'name' => 'Khinkali restaurants',
+                            'type' => 'search'
+                        ],
+                        [
+                            'name' => 'Caucasian cuisine ' . $cityName,
+                            'type' => 'search'
+                        ]
+                    ];
+                }
+                ?>
+
+                <?php if (!empty($relatedSearches)): ?>
                 <div class="card mb-4">
                     <div class="card-header">
                         <h5 class="card-title mb-0">
@@ -511,31 +585,24 @@ echo "<!-- DEBUG: MainPhoto isset: " . (isset($mainPhoto) ? 'YES' : 'NO') . " --
                         </h5>
                     </div>
                     <div class="card-body">
-                        <?php foreach ($restaurant['people_also_search'] as $search): ?>
-                            <?php 
-                            // Безопасное преобразование в строку
-                            $searchText = '';
-                            if (is_array($search)) {
-                                $searchText = implode(' ', array_filter($search, 'is_string'));
-                            } elseif (is_string($search)) {
-                                $searchText = $search;
-                            } else {
-                                $searchText = (string)$search;
-                            }
-                            
-                            // Пропускаем пустые поиски
-                            if (empty(trim($searchText))) continue;
-                            ?>
-                            <a href="<?= base_url('search?q=' . urlencode($searchText)) ?>"
-                               class="badge bg-light text-dark text-decoration-none me-2 mb-2 d-inline-block"
-                               style="border: 1px solid #dee2e6;">
-                                <i class="fas fa-search"></i> <?= esc($searchText) ?>
-                            </a>
+                        <?php foreach ($relatedSearches as $search): ?>
+                            <?php if (!empty($search['name']) && strlen($search['name']) > 3): ?>
+                                <a href="<?= base_url('search?q=' . urlencode($search['name'])) ?>" 
+                                class="btn btn-outline-primary btn-sm me-2 mb-2">
+                                    <i class="fas fa-search me-1"></i>
+                                    <?= esc($search['name']) ?>
+                                    
+                                    <?php if (!empty($search['rating']) && $search['type'] === 'restaurant'): ?>
+                                        <small class="text-muted ms-1">
+                                            (★ <?= number_format($search['rating'], 1) ?>)
+                                        </small>
+                                    <?php endif; ?>
+                                </a>
+                            <?php endif; ?>
                         <?php endforeach; ?>
                     </div>
                 </div>
                 <?php endif; ?>
-
                 <!-- Share Section -->
                 <div class="card mb-4">
                     <div class="card-header">

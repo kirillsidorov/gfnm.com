@@ -324,22 +324,6 @@ class DataForSeoService
         ];
     }
     /**
-     * Поиск заведения по Google Place ID
-     */
-    public function searchByPlaceId($placeId)
-    {
-        $postData = [
-            [
-                'place_id' => $placeId,
-                'language_name' => 'English',
-                'priority' => 2
-            ]
-        ];
-        
-        return $this->makeRequest('/v3/business_data/business_listings/info/live', $postData);
-    }
-
-    /**
      * Поиск Place ID по названию и адресу
      */
     public function findPlaceId($name, $address = '')
@@ -627,5 +611,57 @@ class DataForSeoService
                 'message' => 'Error retrieving API stats: ' . $e->getMessage()
             ];
         }
+    }
+    /**
+     * Публичный доступ к makeRequest для использования в Admin контроллере
+     */
+    public function makeRequestPublic($endpoint, $postData = null, $method = 'POST')
+    {
+        return $this->makeRequest($endpoint, $postData, $method);
+    }
+
+    /**
+     * Поиск по Google Place ID с правильным форматом DataForSEO
+     */
+    public function searchByPlaceId($placeId)
+    {
+        if (empty($placeId)) {
+            return [
+                'success' => false,
+                'error' => 'Place ID is required'
+            ];
+        }
+
+        // Правильный формат фильтра для DataForSEO API
+        $postData = [
+            [
+                'is_claimed' => true,
+                'filters' => ['place_id', '=', $placeId],
+                'limit' => 2
+            ]
+        ];
+        
+        return $this->makeRequest('/v3/business_data/business_listings/search/live', $postData);
+    }
+
+    /**
+     * Поиск по ключевому слову и координатам
+     */
+    public function searchByKeywordAndLocation($keyword, $latitude, $longitude, $radius = 10, $limit = 10)
+    {
+        $postData = [
+            [
+                'keyword' => $keyword,
+                'location_coordinate' => "{$latitude},{$longitude},{$radius}",
+                'is_claimed' => true,
+                'order_by' => ['rating.value,desc'],
+                'filters' => [
+                    ['rating.value', '>', 3.0]
+                ],
+                'limit' => $limit
+            ]
+        ];
+        
+        return $this->makeRequest('/v3/business_data/business_listings/search/live', $postData);
     }
 }

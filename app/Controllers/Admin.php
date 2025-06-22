@@ -2032,283 +2032,701 @@ private function processCsvFile($file)
             ->setHeader('Content-Type', 'application/xml; charset=utf-8')
             ->setBody(file_get_contents($sitemapPath));
     }
-/**
- * AJAX геокодирование адреса
- */
-public function geocodeAddress()
-{
-    $address = $this->request->getPost('address');
-    
-    if (!$address) {
-        return $this->response->setJSON([
-            'success' => false,
-            'message' => 'Адрес не указан'
-        ]);
-    }
-    
-    // Здесь интеграция с Google Geocoding API
-    // Пока возвращаем заглушку
-    return $this->response->setJSON([
-        'success' => false,
-        'message' => 'Геокодирование не настроено'
-    ]);
-}
-
-/**
- * Поиск Google Place ID
- */
-public function findPlaceId()
-{
-    $name = $this->request->getPost('name');
-    $address = $this->request->getPost('address');
-    
-    // Здесь интеграция с Google Places API
-    return $this->response->setJSON([
-        'success' => false,
-        'message' => 'Поиск Place ID не настроен'
-    ]);
-}
-
-/**
- * Обновление ресторана из DataForSEO API
- */
-public function updateFromDataForSEO($restaurantId)
-{
-    if (!is_numeric($restaurantId)) {
-        return $this->response->setJSON([
-            'success' => false,
-            'message' => 'Неверный ID ресторана'
-        ]);
-    }
-
-    $restaurantModel = model('RestaurantModel');
-    $restaurant = $restaurantModel->find($restaurantId);
-
-    if (!$restaurant) {
-        return $this->response->setJSON([
-            'success' => false,
-            'message' => 'Ресторан не найден'
-        ]);
-    }
-
-    try {
-        // Получаем данные из POST запроса
-        $input = $this->request->getJSON(true);
-        $currentPlaceId = $input['current_place_id'] ?? $restaurant['google_place_id'];
-        $restaurantName = $input['restaurant_name'] ?? $restaurant['name'];
-        $restaurantAddress = $input['restaurant_address'] ?? $restaurant['address'];
-
-        // Если нет Place ID, пытаемся найти его
-        if (empty($currentPlaceId)) {
-            $placeIdResult = $this->findPlaceIdForRestaurant($restaurantName, $restaurantAddress);
-            
-            if ($placeIdResult['success']) {
-                $currentPlaceId = $placeIdResult['place_id'];
-                // Сохраняем найденный Place ID
-                $restaurantModel->update($restaurantId, ['google_place_id' => $currentPlaceId]);
-            } else {
-                return $this->response->setJSON([
-                    'success' => false,
-                    'message' => 'Google Place ID не найден. Попробуйте добавить его вручную.'
-                ]);
-            }
-        }
-
-        // Получаем данные из DataForSEO
-        $result = $this->getDataFromDataForSEO($currentPlaceId);
+    /**
+     * AJAX геокодирование адреса
+     */
+    public function geocodeAddress()
+    {
+        $address = $this->request->getPost('address');
         
-        if (!$result['success']) {
+        if (!$address) {
             return $this->response->setJSON([
                 'success' => false,
-                'message' => $result['message']
+                'message' => 'Адрес не указан'
+            ]);
+        }
+        
+        // Здесь интеграция с Google Geocoding API
+        // Пока возвращаем заглушку
+        return $this->response->setJSON([
+            'success' => false,
+            'message' => 'Геокодирование не настроено'
+        ]);
+    }
+
+    /**
+     * Поиск Google Place ID
+     */
+    public function findPlaceId()
+    {
+        $name = $this->request->getPost('name');
+        $address = $this->request->getPost('address');
+        
+        // Здесь интеграция с Google Places API
+        return $this->response->setJSON([
+            'success' => false,
+            'message' => 'Поиск Place ID не настроен'
+        ]);
+    }
+
+    /**
+     * Обновление ресторана из реального DataForSEO API (ФИНАЛЬНАЯ ВЕРСИЯ)
+     */
+    public function updateFromDataForSeo($restaurantId)
+    {
+        // Проверяем авторизацию админа
+        if (!session()->get('admin_logged_in')) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'message' => 'Access denied - admin authorization required'
             ]);
         }
 
-        // Обновляем данные ресторана
-        $updateData = $this->prepareUpdateData($result['data'], $restaurant);
-        
-        if (!empty($updateData)) {
-            $updateData['updated_at'] = date('Y-m-d H:i:s');
-            $updateData['last_updated_api'] = date('Y-m-d H:i:s');
+        // Проверяем AJAX запрос
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'success' => false,
+                'message' => 'Invalid request method'
+            ]);
+        }
+
+        try {
+            $restaurantModel = model('RestaurantModel');
+            $restaurant = $restaurantModel->find($restaurantId);
             
-            if ($restaurantModel->update($restaurantId, $updateData)) {
-                // Логируем обновление
-                log_message('info', "Restaurant {$restaurantId} updated from DataForSEO with Place ID: {$currentPlaceId}");
+            if (!$restaurant) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Restaurant not found'
+                ]);
+            }
+
+            // Получаем данные из POST запроса
+            $requestData = $this->request->getJSON(true);
+            $currentPlaceId = $requestData['current_place_id'] ?? $restaurant['google_place_id'];
+            $restaurantName = $requestData['restaurant_name'] ?? $restaurant['name'];
+            $restaurantAddress = $requestData['restaurant_address'] ?? $restaurant['address'];
+
+            log_message('info', "DataForSEO update started for restaurant {$restaurantId}: {$restaurantName}");
+
+            // Используем реальный DataForSEO API
+            $dataForSeoService = new \App\Services\DataForSeoService();
+            
+            // Проверяем учетные данные API
+            $credentialsCheck = $dataForSeoService->validateCredentials();
+            if (!$credentialsCheck['valid']) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'DataForSEO API credentials invalid: ' . $credentialsCheck['message']
+                ]);
+            }
+
+            $realApiData = null;
+
+            // Если есть Place ID, ищем по нему
+            if (!empty($currentPlaceId)) {
+                $realApiData = $this->searchByPlaceId($dataForSeoService, $currentPlaceId);
+            }
+
+            // Если нет данных по Place ID, ищем по названию и адресу
+            if (!$realApiData && !empty($restaurantName)) {
+                $realApiData = $this->searchByNameAndAddress($dataForSeoService, $restaurantName, $restaurantAddress, $restaurant);
+            }
+
+            // Если всё равно нет данных, сообщаем об этом
+            if (!$realApiData) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'No matching restaurant found in DataForSEO API. Try updating the Google Place ID or restaurant name.'
+                ]);
+            }
+
+            // Выполняем импорт/обновление
+            $importService = new \App\Services\DataForSeoImportService();
+            $result = $importService->importChamaMamaData($realApiData);
+            
+            log_message('info', 'DataForSEO update result: ' . json_encode($result));
+            
+            if ($result['success']) {
+                // Получаем обновленные данные ресторана
+                $updatedRestaurant = $restaurantModel->find($restaurantId);
                 
                 return $this->response->setJSON([
                     'success' => true,
-                    'message' => 'Данные ресторана успешно обновлены из DataForSEO!',
-                    'updated_data' => $updateData,
-                    'place_id' => $currentPlaceId
+                    'message' => '🎉 Restaurant updated with REAL DataForSEO API data! Source: ' . ($realApiData['_source'] ?? 'unknown'),
+                    'updated_data' => $updatedRestaurant,
+                    'api_source' => $realApiData['_source'] ?? 'real_api',
+                    'api_cost' => $realApiData['cost'] ?? 0,
+                    'import_stats' => [
+                        'imported' => $result['imported'] ?? 0,
+                        'updated' => $result['updated'] ?? 0,
+                        'errors' => count($result['errors'] ?? [])
+                    ]
                 ]);
             } else {
                 return $this->response->setJSON([
                     'success' => false,
-                    'message' => 'Ошибка при сохранении данных в базе'
+                    'message' => $result['error'] ?? 'Failed to update restaurant data from DataForSEO',
+                    'details' => $result
                 ]);
             }
-        } else {
+
+        } catch (\Exception $e) {
+            log_message('error', 'DataForSEO update error for restaurant ' . $restaurantId . ': ' . $e->getMessage());
+            
             return $this->response->setJSON([
-                'success' => true,
-                'message' => 'Данные уже актуальны. Обновление не требуется.',
-                'updated_data' => []
+                'success' => false,
+                'message' => 'Error updating restaurant: ' . $e->getMessage(),
+                'trace' => ENVIRONMENT === 'development' ? $e->getTraceAsString() : null
             ]);
         }
-
-    } catch (\Exception $e) {
-        log_message('error', 'DataForSEO update error: ' . $e->getMessage());
-        return $this->response->setJSON([
-            'success' => false,
-            'message' => 'Ошибка при обновлении: ' . $e->getMessage()
-        ]);
     }
-}
 
-/**
- * Поиск Place ID для ресторана
- */
-private function findPlaceIdForRestaurant($name, $address = '')
-{
-    try {
-        $dataForSeoService = new \App\Services\DataForSeoService();
-        return $dataForSeoService->findPlaceId($name, $address);
-    } catch (\Exception $e) {
-        return [
-            'success' => false,
-            'message' => 'Ошибка поиска Place ID: ' . $e->getMessage()
-        ];
+    /**
+     * Поиск в DataForSEO по Place ID (ПРАВИЛЬНЫЙ ФОРМАТ)
+     */
+    private function searchByPlaceId($dataForSeoService, $placeId)
+    {
+        try {
+            log_message('info', "DataForSEO: Searching by Place ID: {$placeId}");
+
+            // Используем правильный метод из сервиса
+            $apiResponse = $dataForSeoService->searchByPlaceId($placeId);
+            
+            if ($apiResponse['success'] && !empty($apiResponse['data']['tasks'])) {
+                foreach ($apiResponse['data']['tasks'] as $task) {
+                    if ($task['status_code'] === 20000 && !empty($task['result'])) {
+                        foreach ($task['result'] as $resultSet) {
+                            if (!empty($resultSet['items'])) {
+                                // Создаем правильную структуру ответа
+                                $realData = [
+                                    'id' => 'real-place-id-' . time(),
+                                    'status_code' => 20000,
+                                    'status_message' => 'Ok.',
+                                    'time' => $task['time'] ?? '0.1 sec.',
+                                    'cost' => $task['cost'] ?? 0,
+                                    'result_count' => 1,
+                                    'result' => [
+                                        [
+                                            'total_count' => $resultSet['total_count'] ?? 1,
+                                            'count' => $resultSet['count'] ?? 1,
+                                            'offset' => 0,
+                                            'items' => $resultSet['items']
+                                        ]
+                                    ],
+                                    '_source' => 'real_place_id_api'
+                                ];
+
+                                log_message('info', 'DataForSEO: Found real data by Place ID - ' . ($resultSet['items'][0]['title'] ?? 'Unknown'));
+                                return $realData;
+                            }
+                        }
+                    }
+                }
+            }
+
+            log_message('info', 'DataForSEO: No data found by Place ID: ' . $placeId);
+            return null;
+
+        } catch (\Exception $e) {
+            log_message('error', 'DataForSEO Place ID search error: ' . $e->getMessage());
+            return null;
+        }
     }
-}
 
-/**
- * Получение данных из DataForSEO API
- */
-private function getDataFromDataForSEO($placeId)
-{
-    try {
-        $dataForSeoService = new \App\Services\DataForSeoService();
-        $result = $dataForSeoService->searchByPlaceId($placeId);
+    /**
+     * Поиск в DataForSEO по названию и координатам
+     */
+    private function searchByNameAndAddress($dataForSeoService, $name, $address, $restaurant)
+    {
+        try {
+            // Определяем координаты для поиска
+            $latitude = $restaurant['latitude'] ?: 37.7749; // Default SF
+            $longitude = $restaurant['longitude'] ?: -122.4194;
+
+            // Очищаем название от лишних слов
+            $cleanName = $this->cleanRestaurantName($name);
+            $keyword = $cleanName . ' georgian restaurant';
+
+            log_message('info', "DataForSEO: Searching by keyword '{$keyword}' at {$latitude},{$longitude}");
+
+            // Используем метод из сервиса
+            $apiResponse = $dataForSeoService->searchByKeywordAndLocation($keyword, $latitude, $longitude, 10, 10);
+            
+            if ($apiResponse['success'] && !empty($apiResponse['data']['tasks'])) {
+                foreach ($apiResponse['data']['tasks'] as $task) {
+                    if ($task['status_code'] === 20000 && !empty($task['result'])) {
+                        foreach ($task['result'] as $resultSet) {
+                            if (!empty($resultSet['items'])) {
+                                // Ищем лучшее совпадение по названию
+                                $bestMatch = $this->findBestRestaurantMatch($resultSet['items'], $name, $address);
+                                if ($bestMatch) {
+                                    // Создаем структуру ответа
+                                    $realData = [
+                                        'id' => 'real-name-search-' . time(),
+                                        'status_code' => 20000,
+                                        'status_message' => 'Ok.',
+                                        'time' => $task['time'] ?? '0.1 sec.',
+                                        'cost' => $task['cost'] ?? 0,
+                                        'result_count' => 1,
+                                        'result' => [
+                                            [
+                                                'total_count' => 1,
+                                                'count' => 1,
+                                                'offset' => 0,
+                                                'items' => [$bestMatch]
+                                            ]
+                                        ],
+                                        '_source' => 'real_name_search_api'
+                                    ];
+
+                                    log_message('info', 'DataForSEO: Found real data by name/location - ' . $bestMatch['title']);
+                                    return $realData;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            log_message('info', 'DataForSEO: No matching restaurant found by name/location');
+            return null;
+
+        } catch (\Exception $e) {
+            log_message('error', 'DataForSEO name search error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Остальные вспомогательные методы остаются без изменений
+     */
+    private function cleanRestaurantName($name)
+    {
+        $commonWords = ['restaurant', 'cafe', 'bar', 'grill', 'kitchen', 'house', 'the', 'a', 'an'];
+        $words = explode(' ', strtolower($name));
+        $cleanWords = array_filter($words, function($word) use ($commonWords) {
+            return !in_array(trim($word), $commonWords) && strlen(trim($word)) > 2;
+        });
         
-        if (!$result['success']) {
-            return [
-                'success' => false,
-                'message' => 'Ошибка API DataForSEO: ' . ($result['error'] ?? 'Неизвестная ошибка')
-            ];
+        return implode(' ', $cleanWords) ?: $name;
+    }
+
+    private function findBestRestaurantMatch($items, $targetName, $targetAddress)
+    {
+        $bestMatch = null;
+        $bestScore = 0;
+
+        foreach ($items as $item) {
+            $score = 0;
+            $itemName = $item['title'] ?? '';
+            $itemAddress = $item['address'] ?? '';
+
+            // Сравнение названий (основной критерий)
+            $nameScore = $this->calculateSimilarity($targetName, $itemName);
+            $score += $nameScore * 0.7; // 70% веса
+
+            // Сравнение адресов (дополнительный критерий)
+            if (!empty($targetAddress) && !empty($itemAddress)) {
+                $addressScore = $this->calculateSimilarity($targetAddress, $itemAddress);
+                $score += $addressScore * 0.3; // 30% веса
+            }
+
+            // Проверяем что это действительно ресторан грузинской кухни
+            $isGeorgian = stripos($itemName, 'georgian') !== false || 
+                         stripos($item['category'] ?? '', 'georgian') !== false ||
+                         stripos($item['description'] ?? '', 'georgian') !== false ||
+                         stripos($item['description'] ?? '', 'khachapuri') !== false ||
+                         stripos($item['description'] ?? '', 'khinkali') !== false;
+
+            if ($isGeorgian) {
+                $score += 0.2; // Бонус за грузинскую кухню
+            }
+
+            log_message('info', "Restaurant match score for '{$itemName}': {$score}");
+
+            if ($score > $bestScore && $score > 0.4) { // Снижаем порог до 0.4
+                $bestScore = $score;
+                $bestMatch = $item;
+            }
         }
 
-        // Извлекаем данные из ответа API
-        $data = $result['data'];
-        if (empty($data['tasks']) || $data['tasks'][0]['status_code'] !== 20000) {
-            return [
-                'success' => false,
-                'message' => 'API вернул ошибку или не найдены данные'
-            ];
+        return $bestMatch;
+    }
+
+    private function calculateSimilarity($str1, $str2)
+    {
+        if (empty($str1) || empty($str2)) {
+            return 0;
         }
 
-        $items = $data['tasks'][0]['result'][0]['items'] ?? [];
-        if (empty($items)) {
-            return [
-                'success' => false,
-                'message' => 'Данные ресторана не найдены в DataForSEO'
-            ];
+        $str1 = strtolower(trim($str1));
+        $str2 = strtolower(trim($str2));
+
+        // Exact match
+        if ($str1 === $str2) {
+            return 1.0;
         }
 
+        // Contains match
+        if (strpos($str1, $str2) !== false || strpos($str2, $str1) !== false) {
+            return 0.8;
+        }
+
+        // Levenshtein distance
+        $maxLen = max(strlen($str1), strlen($str2));
+        if ($maxLen === 0) {
+            return 0;
+        }
+
+        $distance = levenshtein($str1, $str2);
+        return 1 - ($distance / $maxLen);
+    }
+
+    /**
+     * Создание mock данных DataForSEO для тестирования
+     * В реальном проекте здесь был бы настоящий API запрос
+     */
+    private function createMockDataForSeoResponse($restaurant, $placeId)
+    {
         return [
-            'success' => true,
-            'data' => $items[0] // Берем первый результат
+            "id" => "test-" . time(),
+            "status_code" => 20000,
+            "status_message" => "Ok.",
+            "time" => "0.1246 sec.",
+            "cost" => 0.0106,
+            "result_count" => 1,
+            "result" => [
+                [
+                    "total_count" => 1,
+                    "count" => 1,
+                    "offset" => 0,
+                    "items" => [
+                        [
+                            "type" => "business_listing",
+                            "title" => $restaurant['name'],
+                            "original_title" => null,
+                            "description" => $restaurant['description'] ?: "Updated description from DataForSEO API",
+                            "category" => $restaurant['category'] ?: "Georgian restaurant",
+                            "category_ids" => ["georgian_restaurant", "restaurant"],
+                            "additional_categories" => ["Georgian restaurant", "Restaurant"],
+                            "phone" => $restaurant['phone'] ?: "+1 555-0123",
+                            "website" => $restaurant['website'] ?: "https://example.com",
+                            "domain" => "example.com",
+                            "snippet" => "Updated snippet from DataForSEO",
+                            "address" => $restaurant['address'] ?: "123 Test Street, Test City",
+                            "address_info" => [
+                                "borough" => "Test Borough",
+                                "address" => $restaurant['address'] ?: "123 Test Street",
+                                "city" => "Test City",
+                                "zip" => "10001",
+                                "region" => "NY",
+                                "country_code" => "US"
+                            ],
+                            "place_id" => $placeId,
+                            "cid" => "test_cid_" . time(),
+                            "feature_id" => "test_feature_id",
+                            "latitude" => $restaurant['latitude'] ?: 40.7580,
+                            "longitude" => $restaurant['longitude'] ?: -73.9855,
+                            "is_claimed" => true,
+                            "rating" => [
+                                "rating_type" => "Max5",
+                                "value" => max($restaurant['rating'] ?: 4.2, 4.2), // Улучшаем рейтинг
+                                "votes_count" => 150,
+                                "rating_max" => 5
+                            ],
+                            "rating_distribution" => [
+                                "1" => 5,
+                                "2" => 3,
+                                "3" => 12,
+                                "4" => 45,
+                                "5" => 85
+                            ],
+                            "price_level" => $restaurant['price_level'] ?: "$$",
+                            "total_photos" => 50,
+                            "logo" => "https://example.com/logo.jpg",
+                            "main_image" => "https://example.com/main.jpg",
+                            "attributes" => [
+                                "available_attributes" => [
+                                    "service_options" => [
+                                        "dine_in",
+                                        "takeout",
+                                        "delivery"
+                                    ],
+                                    "dining_options" => [
+                                        "dinner",
+                                        "lunch"
+                                    ],
+                                    "atmosphere" => [
+                                        "casual",
+                                        "cozy"
+                                    ],
+                                    "crowd" => [
+                                        "families",
+                                        "couples"
+                                    ],
+                                    "payments" => [
+                                        "credit_cards",
+                                        "mobile_payments"
+                                    ],
+                                    "accessibility" => [
+                                        "wheelchair_accessible"
+                                    ]
+                                ]
+                            ],
+                            "work_time" => [
+                                "work_hours" => [
+                                    "timetable" => [
+                                        "monday" => [
+                                            [
+                                                "open" => ["hour" => 17, "minute" => 0],
+                                                "close" => ["hour" => 23, "minute" => 0]
+                                            ]
+                                        ],
+                                        "tuesday" => [
+                                            [
+                                                "open" => ["hour" => 17, "minute" => 0],
+                                                "close" => ["hour" => 23, "minute" => 0]
+                                            ]
+                                        ],
+                                        "wednesday" => [
+                                            [
+                                                "open" => ["hour" => 17, "minute" => 0],
+                                                "close" => ["hour" => 23, "minute" => 0]
+                                            ]
+                                        ],
+                                        "thursday" => [
+                                            [
+                                                "open" => ["hour" => 17, "minute" => 0],
+                                                "close" => ["hour" => 23, "minute" => 0]
+                                            ]
+                                        ],
+                                        "friday" => [
+                                            [
+                                                "open" => ["hour" => 17, "minute" => 0],
+                                                "close" => ["hour" => 23, "minute" => 30]
+                                            ]
+                                        ],
+                                        "saturday" => [
+                                            [
+                                                "open" => ["hour" => 10, "minute" => 0],
+                                                "close" => ["hour" => 23, "minute" => 30]
+                                            ]
+                                        ],
+                                        "sunday" => [
+                                            [
+                                                "open" => ["hour" => 10, "minute" => 0],
+                                                "close" => ["hour" => 22, "minute" => 0]
+                                            ]
+                                        ]
+                                    ],
+                                    "current_status" => "open"
+                                ]
+                            ],
+                            "popular_times" => [
+                                "monday" => [
+                                    "popular_times_histogram" => [
+                                        17 => 15,
+                                        18 => 35,
+                                        19 => 65,
+                                        20 => 85,
+                                        21 => 75,
+                                        22 => 45
+                                    ]
+                                ],
+                                "friday" => [
+                                    "popular_times_histogram" => [
+                                        17 => 25,
+                                        18 => 45,
+                                        19 => 75,
+                                        20 => 95,
+                                        21 => 85,
+                                        22 => 65,
+                                        23 => 35
+                                    ]
+                                ]
+                            ],
+                            "people_also_search" => [
+                                [
+                                    "title" => "Similar Georgian Restaurant",
+                                    "place_id" => "ChIJ_similar_1",
+                                    "cid" => "similar_cid_1",
+                                    "rating" => ["value" => 4.1, "votes_count" => 89]
+                                ]
+                            ],
+                            "place_topics" => [
+                                "georgian_cuisine" => 25,
+                                "khachapuri" => 18,
+                                "cozy_atmosphere" => 12
+                            ],
+                            "local_business_links" => [
+                                [
+                                    "type" => "reservation",
+                                    "title" => "OpenTable",
+                                    "url" => "https://www.opentable.com/test"
+                                ],
+                                [
+                                    "type" => "menu",
+                                    "title" => "Menu",
+                                    "url" => $restaurant['website'] ?: "https://example.com/menu"
+                                ]
+                            ],
+                            "check_url" => "https://www.google.com/maps?cid=test_check_url",
+                            "last_updated_time" => date('Y-m-d H:i:s'),
+                            "first_seen" => $restaurant['created_at'] ?: date('Y-m-d H:i:s')
+                        ]
+                    ]
+                ]
+            ]
+        ];
+    }
+
+
+    /**
+     * Поиск Place ID для ресторана
+     */
+    private function findPlaceIdForRestaurant($name, $address = '')
+    {
+        try {
+            $dataForSeoService = new \App\Services\DataForSeoService();
+            return $dataForSeoService->findPlaceId($name, $address);
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Ошибка поиска Place ID: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Получение данных из DataForSEO API
+     */
+    private function getDataFromDataForSEO($placeId)
+    {
+        try {
+            $dataForSeoService = new \App\Services\DataForSeoService();
+            $result = $dataForSeoService->searchByPlaceId($placeId);
+            
+            if (!$result['success']) {
+                return [
+                    'success' => false,
+                    'message' => 'Ошибка API DataForSEO: ' . ($result['error'] ?? 'Неизвестная ошибка')
+                ];
+            }
+
+            // Извлекаем данные из ответа API
+            $data = $result['data'];
+            if (empty($data['tasks']) || $data['tasks'][0]['status_code'] !== 20000) {
+                return [
+                    'success' => false,
+                    'message' => 'API вернул ошибку или не найдены данные'
+                ];
+            }
+
+            $items = $data['tasks'][0]['result'][0]['items'] ?? [];
+            if (empty($items)) {
+                return [
+                    'success' => false,
+                    'message' => 'Данные ресторана не найдены в DataForSEO'
+                ];
+            }
+
+            return [
+                'success' => true,
+                'data' => $items[0] // Берем первый результат
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Ошибка получения данных: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Подготовка данных для обновления
+     */
+    private function prepareUpdateData($apiData, $currentData)
+    {
+        $updateData = [];
+
+        // Маппинг полей API -> поля БД
+        $fieldMapping = [
+            'title' => 'name',
+            'description' => 'description',
+            'phone' => 'phone',
+            'url' => 'website',
+            'address' => 'address',
+            'latitude' => 'latitude',
+            'longitude' => 'longitude'
         ];
 
-    } catch (\Exception $e) {
-        return [
-            'success' => false,
-            'message' => 'Ошибка получения данных: ' . $e->getMessage()
-        ];
-    }
-}
-
-/**
- * Подготовка данных для обновления
- */
-private function prepareUpdateData($apiData, $currentData)
-{
-    $updateData = [];
-
-    // Маппинг полей API -> поля БД
-    $fieldMapping = [
-        'title' => 'name',
-        'description' => 'description',
-        'phone' => 'phone',
-        'url' => 'website',
-        'address' => 'address',
-        'latitude' => 'latitude',
-        'longitude' => 'longitude'
-    ];
-
-    // Обновляем только если новые данные отличаются и не пустые
-    foreach ($fieldMapping as $apiField => $dbField) {
-        if (isset($apiData[$apiField]) && !empty($apiData[$apiField])) {
-            $newValue = $apiData[$apiField];
-            $oldValue = $currentData[$dbField] ?? '';
-            
-            // Специальная обработка для некоторых полей
-            if ($dbField === 'website' && !filter_var($newValue, FILTER_VALIDATE_URL)) {
-                continue; // Пропускаем невалидные URL
-            }
-            
-            if ($dbField === 'phone') {
-                $newValue = $this->formatPhone($newValue);
-            }
-            
-            // Обновляем только если значения отличаются
-            if (trim($oldValue) !== trim($newValue)) {
-                $updateData[$dbField] = $newValue;
+        // Обновляем только если новые данные отличаются и не пустые
+        foreach ($fieldMapping as $apiField => $dbField) {
+            if (isset($apiData[$apiField]) && !empty($apiData[$apiField])) {
+                $newValue = $apiData[$apiField];
+                $oldValue = $currentData[$dbField] ?? '';
+                
+                // Специальная обработка для некоторых полей
+                if ($dbField === 'website' && !filter_var($newValue, FILTER_VALIDATE_URL)) {
+                    continue; // Пропускаем невалидные URL
+                }
+                
+                if ($dbField === 'phone') {
+                    $newValue = $this->formatPhone($newValue);
+                }
+                
+                // Обновляем только если значения отличаются
+                if (trim($oldValue) !== trim($newValue)) {
+                    $updateData[$dbField] = $newValue;
+                }
             }
         }
-    }
 
-    // Обновляем рейтинг
-    if (isset($apiData['rating']['value']) && $apiData['rating']['value'] > 0) {
-        $newRating = floatval($apiData['rating']['value']);
-        $oldRating = floatval($currentData['rating'] ?? 0);
-        
-        if (abs($newRating - $oldRating) > 0.1) { // Обновляем если разница больше 0.1
-            $updateData['rating'] = $newRating;
+        // Обновляем рейтинг
+        if (isset($apiData['rating']['value']) && $apiData['rating']['value'] > 0) {
+            $newRating = floatval($apiData['rating']['value']);
+            $oldRating = floatval($currentData['rating'] ?? 0);
+            
+            if (abs($newRating - $oldRating) > 0.1) { // Обновляем если разница больше 0.1
+                $updateData['rating'] = $newRating;
+            }
         }
-    }
 
-    // Обновляем уровень цен
-    if (isset($apiData['price_level']) && !empty($apiData['price_level'])) {
-        $priceLevel = $this->convertPriceLevel($apiData['price_level']);
-        if ($priceLevel !== $currentData['price_level']) {
-            $updateData['price_level'] = $priceLevel;
+        // Обновляем уровень цен
+        if (isset($apiData['price_level']) && !empty($apiData['price_level'])) {
+            $priceLevel = $this->convertPriceLevel($apiData['price_level']);
+            if ($priceLevel !== $currentData['price_level']) {
+                $updateData['price_level'] = $priceLevel;
+            }
         }
+
+        // Обновляем CID если есть
+        if (isset($apiData['cid']) && !empty($apiData['cid'])) {
+            $updateData['cid'] = $apiData['cid'];
+        }
+
+        return $updateData;
     }
 
-    // Обновляем CID если есть
-    if (isset($apiData['cid']) && !empty($apiData['cid'])) {
-        $updateData['cid'] = $apiData['cid'];
+    /**
+     * Форматирование номера телефона
+     */
+    private function formatPhone($phone)
+    {
+        // Простое форматирование - убираем лишние символы
+        return preg_replace('/[^\d+()-\s]/', '', $phone);
     }
 
-    return $updateData;
-}
-
-/**
- * Форматирование номера телефона
- */
-private function formatPhone($phone)
-{
-    // Простое форматирование - убираем лишние символы
-    return preg_replace('/[^\d+()-\s]/', '', $phone);
-}
-
-/**
- * Конвертация уровня цен
- */
-private function convertPriceLevel($priceLevel)
-{
-    if (is_string($priceLevel)) {
-        return substr_count($priceLevel, '$');
+    /**
+     * Конвертация уровня цен
+     */
+    private function convertPriceLevel($priceLevel)
+    {
+        if (is_string($priceLevel)) {
+            return substr_count($priceLevel, '$');
+        }
+        return max(0, min(4, intval($priceLevel)));
     }
-    return max(0, min(4, intval($priceLevel)));
-}
 }

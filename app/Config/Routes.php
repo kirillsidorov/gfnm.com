@@ -105,7 +105,8 @@ $routes->group('admin', ['filter' => 'adminauth'], function($routes) {
     $routes->delete('restaurants/photos/(:num)/delete', 'Admin::deletePhoto/$1');
     $routes->get('restaurants/(:num)/preview-google-photos', 'Admin::previewGooglePhotos/$1');
     $routes->post('restaurants/(:num)/import-google-photos', 'Admin::importGooglePhotos/$1');
-    
+    $routes->post('restaurants/update-from-dataforseo/(:num)', 'Admin::updateFromDataForSeo/$1');
+
     // AJAX методы для SEO полей (только SEO URL проверка)
     $routes->post('restaurants/check-seo-url-availability', 'Admin::checkSeoUrlAvailability');
     $routes->post('restaurants/generate-slug', 'Admin::generateSlug');
@@ -189,7 +190,7 @@ $routes->group('admin', ['filter' => 'adminauth'], function($routes) {
 
     // Главная страница импорта
     $routes->get('dataforseo-import', 'DataForSeoImport::index');
-    
+   
     // Обновление одного ресторана
     $routes->post('update-restaurant/(:num)', 'DataForSeoImport::updateRestaurant/$1');
     

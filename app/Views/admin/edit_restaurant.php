@@ -917,37 +917,25 @@ function showAlert(type, message) {
 
 // Инициализация превью при загрузке
 updatePreviews();
-</script>
-// ДОБАВИТЬ В КОНЕЦ app/Views/admin/edit_restaurant.php В СЕКЦИЮ scripts
-
-<script>
-// Функция обновления данных ресторана из DataForSEO
-function updateFromDataForSEO() {
-    const restaurantId = <?= $restaurant['id'] ?? 0 ?>;
+function updateSingleRestaurant(restaurantId) {
     const placeId = document.getElementById('google_place_id')?.value;
+    const restaurantName = document.getElementById('name')?.value || '';
+    const restaurantAddress = document.getElementById('address')?.value || '';
     
     if (!restaurantId) {
-        alert('Ошибка: ID ресторана не найден');
+        showDataForSeoAlert('danger', 'Ошибка: ID ресторана не найден');
         return;
     }
     
     if (!placeId) {
-        if (!confirm('Google Place ID не заполнен. Попробовать найти его автоматически и обновить данные?')) {
+        if (!confirm('Google Place ID не заполнен. Попробовать обновить данные без него?')) {
             return;
         }
     }
     
-    const button = document.querySelector('[onclick*="updateFromDataForSEO"]');
-    if (!button) {
-        // Если кнопка вызвана не через onclick, ищем по тексту
-        const buttons = document.querySelectorAll('button');
-        for (let btn of buttons) {
-            if (btn.textContent.includes('DataForSEO')) {
-                button = btn;
-                break;
-            }
-        }
-    }
+    // Находим кнопку DataForSEO
+    const button = document.querySelector(`button[onclick*="updateSingleRestaurant(${restaurantId})"]`) ||
+                   document.querySelector('button[onclick*="DataForSEO"]');
     
     const originalText = button ? button.innerHTML : '';
     
@@ -957,9 +945,10 @@ function updateFromDataForSEO() {
     }
     
     // Показываем уведомление о начале процесса
-    showAlert('info', 'Начинаем обновление данных из DataForSEO...', 3000);
+    showDataForSeoAlert('info', 'Начинаем обновление данных из DataForSEO...', 3000);
     
-    fetch(`/admin/restaurants/update-from-dataforseo/${restaurantId}`, {
+    // Выполняем запрос к правильному роуту
+    fetch(`<?= base_url() ?>admin/restaurants/update-from-dataforseo/${restaurantId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -967,18 +956,18 @@ function updateFromDataForSEO() {
         },
         body: JSON.stringify({
             current_place_id: placeId,
-            restaurant_name: document.getElementById('name')?.value || '',
-            restaurant_address: document.getElementById('address')?.value || ''
+            restaurant_name: restaurantName,
+            restaurant_address: restaurantAddress
         })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showAlert('success', data.message || 'Данные успешно обновлены из DataForSEO!', 5000);
+            showDataForSeoAlert('success', data.message || 'Данные успешно обновлены из DataForSEO!', 5000);
             
             // Обновляем поля формы если данные изменились
             if (data.updated_data) {
-                updateFormFields(data.updated_data);
+                updateFormFieldsDataForSeo(data.updated_data);
             }
             
             // Предлагаем перезагрузить страницу для отображения всех изменений
@@ -989,12 +978,12 @@ function updateFromDataForSEO() {
             }, 2000);
             
         } else {
-            showAlert('danger', data.message || 'Ошибка при обновлении данных', 8000);
+            showDataForSeoAlert('danger', data.message || 'Ошибка при обновлении данных', 8000);
         }
     })
     .catch(error => {
         console.error('Ошибка:', error);
-        showAlert('danger', 'Ошибка при выполнении запроса: ' + error.message, 8000);
+        showDataForSeoAlert('danger', 'Ошибка при выполнении запроса: ' + error.message, 8000);
     })
     .finally(() => {
         if (button) {
@@ -1004,8 +993,8 @@ function updateFromDataForSEO() {
     });
 }
 
-// Функция обновления полей формы
-function updateFormFields(updatedData) {
+// Функция обновления полей формы (переименована чтобы не конфликтовать)
+function updateFormFieldsDataForSeo(updatedData) {
     const fieldsMap = {
         'name': 'name',
         'description': 'description', 
@@ -1038,10 +1027,10 @@ function updateFormFields(updatedData) {
     }
 }
 
-// Улучшенная функция показа уведомлений
-function showAlert(type, message, duration = 5000) {
-    // Удаляем предыдущие уведомления этого типа
-    const existingAlerts = document.querySelectorAll(`.alert-${type}.dataforseo-alert`);
+// Специальная функция для уведомлений DataForSEO (чтобы не конфликтовать с основной)
+function showDataForSeoAlert(type, message, duration = 5000) {
+    // Удаляем предыдущие уведомления DataForSEO
+    const existingAlerts = document.querySelectorAll('.dataforseo-alert');
     existingAlerts.forEach(alert => alert.remove());
     
     const alertClass = `alert-${type}`;
@@ -1049,7 +1038,7 @@ function showAlert(type, message, duration = 5000) {
                      type === 'danger' ? 'exclamation-circle' : 
                      type === 'warning' ? 'exclamation-triangle' : 'info-circle';
     
-    const alertId = 'alert-' + Date.now();
+    const alertId = 'dataforseo-alert-' + Date.now();
     const alert = document.createElement('div');
     alert.id = alertId;
     alert.className = `alert ${alertClass} alert-dismissible fade show position-fixed dataforseo-alert`;
@@ -1059,7 +1048,7 @@ function showAlert(type, message, duration = 5000) {
         <div class="d-flex align-items-start">
             <i class="fas fa-${iconClass} me-2 mt-1"></i>
             <div class="flex-grow-1">
-                ${message}
+                <strong>DataForSEO:</strong> ${message}
             </div>
             <button type="button" class="btn-close ms-2" data-bs-dismiss="alert"></button>
         </div>
@@ -1079,16 +1068,8 @@ function showAlert(type, message, duration = 5000) {
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
-    // Проверяем наличие кнопки DataForSEO и добавляем обработчик если нужно
-    const dataForSeoButtons = document.querySelectorAll('button');
-    dataForSeoButtons.forEach(button => {
-        if (button.textContent.includes('DataForSEO') || button.textContent.includes('Обновить из DataForSEO')) {
-            button.addEventListener('click', function(e) {
-                e.preventDefault();
-                updateFromDataForSEO();
-            });
-        }
-    });
+    console.log('DataForSEO integration loaded');
 });
 </script>
+
 <?= $this->endSection() ?>

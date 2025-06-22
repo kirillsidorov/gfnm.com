@@ -120,12 +120,8 @@ class RestaurantsEnhance extends BaseController
         return view('restaurants/enhanced_view', $data);
     }
 
-
-
-
-
-    /**
-     * Обработка данных ресторана - декодирование JSON полей
+/**
+     * Обработка данных ресторана - декодирование JSON полей (ИСПРАВЛЕННАЯ ВЕРСИЯ)
      */
     private function processRestaurantData($restaurant)
     {
@@ -142,9 +138,17 @@ class RestaurantsEnhance extends BaseController
                 $decoded = json_decode($restaurant[$field], true);
                 if (json_last_error() === JSON_ERROR_NONE) {
                     $restaurant[$field] = $decoded;
+                } else {
+                    // Если JSON невалидный, оставляем как есть или делаем пустым массивом
+                    if (in_array($field, ['people_also_search', 'place_topics', 'service_options'])) {
+                        $restaurant[$field] = [];
+                    }
                 }
             }
         }
+
+        // Загружаем связанные рестораны из отдельной таблицы
+        $restaurant['related_restaurants'] = $this->getRelatedRestaurants($restaurant['id']);
 
         // Обрабатываем статус ресторана
         $restaurant['status_info'] = $this->getStatusInfo($restaurant);
@@ -156,6 +160,23 @@ class RestaurantsEnhance extends BaseController
         $restaurant['avg_popular_times'] = $this->calculateAveragePopularTimes($restaurant['popular_times'] ?? []);
 
         return $restaurant;
+    }
+
+    /**
+     * Получение связанных ресторанов из таблицы restaurant_relations
+     */
+    private function getRelatedRestaurants($restaurantId)
+    {
+        $db = \Config\Database::connect();
+        
+        return $db->table('restaurant_relations')
+                  ->where('restaurant_id', $restaurantId)
+                  ->where('relation_type', 'people_also_search')
+                  ->where('related_name !=', '')
+                  ->orderBy('related_rating', 'DESC')
+                  ->limit(8)
+                  ->get()
+                  ->getResultArray();
     }
 
     /**
