@@ -322,7 +322,7 @@ class RestaurantsEnhance extends BaseController
                 $totalDays++;
                 foreach ($times as $hour => $value) {
                     if (!isset($hours[$hour])) $hours[$hour] = 0;
-                    $hours[$hour] += $value;
+                    $hours[$hour] += is_numeric($value) ? (int)$value : 0;
                 }
             }
         }
@@ -384,12 +384,12 @@ class RestaurantsEnhance extends BaseController
         foreach ($popularTimes as $day => $hours) {
             if (!is_array($hours)) continue;
 
-            $dayTotal = array_sum($hours);
+            $dayTotal = array_sum(array_filter($hours, 'is_numeric'));
             $dayTotals[$day] = $dayTotal;
 
             foreach ($hours as $hour => $value) {
                 if (!isset($hourTotals[$hour])) $hourTotals[$hour] = 0;
-                $hourTotals[$hour] += $value;
+                $hourTotals[$hour] += is_numeric($value) ? (int)$value : 0;
             }
         }
 

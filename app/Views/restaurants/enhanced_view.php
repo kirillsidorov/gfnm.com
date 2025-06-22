@@ -9,7 +9,42 @@ echo "<!-- DEBUG: MainPhoto isset: " . (isset($mainPhoto) ? 'YES' : 'NO') . " --
 <?= $this->section('content') ?>
 
 <?php if (isset($restaurant) && !empty($restaurant)): ?>
-
+<?php if (isset($restaurant['is_georgian']) && $restaurant['is_georgian'] == 0): ?>
+<!-- Уведомление о неграузинском ресторане -->
+<div class="alert alert-warning border-warning bg-warning-subtle mb-4" role="alert">
+    <div class="d-flex align-items-start">
+        <i class="fas fa-exclamation-triangle text-warning me-3 mt-1" style="font-size: 1.5rem;"></i>
+        <div class="flex-grow-1">
+            <h5 class="alert-heading mb-2">
+                <i class="fas fa-info-circle me-2"></i>This restaurant is not Georgian
+            </h5>
+            <p class="mb-3">
+                We've determined that this restaurant doesn't serve authentic Georgian cuisine. 
+                We recommend checking out verified Georgian restaurants in your area for authentic 
+                <strong>khachapuri</strong>, <strong>khinkali</strong>, and traditional Georgian dishes.
+            </p>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="<?= base_url('georgian-restaurant-near-me') ?>" class="btn btn-warning btn-sm">
+                    <i class="fas fa-search me-1"></i>Find Georgian Restaurants Near Me
+                </a>
+               <?php if (!empty($restaurant['city_slug'])): ?>
+                    <a href="<?= base_url('georgian-restaurants-' . $restaurant['city_slug']) ?>" 
+                    class="btn btn-outline-warning btn-sm">
+                        <i class="fas fa-map-marker-alt me-1"></i>Georgian Restaurants in <?= esc($restaurant['city_name']) ?>
+                    </a>
+                <?php elseif (!empty($restaurant['city_name'])): ?>
+                    <!-- Fallback если нет city_slug -->
+                    <a href="<?= base_url('restaurants') ?>" 
+                    class="btn btn-outline-warning btn-sm">
+                        <i class="fas fa-list me-1"></i>Browse Georgian Restaurants
+                    </a>
+                <?php endif; ?>
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+</div>
+<?php endif; ?>
 <!-- Restaurant Header -->
 <section class="bg-light py-5">
     <div class="container">
@@ -908,6 +943,27 @@ echo "<!-- DEBUG: MainPhoto isset: " . (isset($mainPhoto) ? 'YES' : 'NO') . " --
 
 .text-georgian {
     color: var(--georgian-red) !important;
+}
+
+.bg-warning-subtle {
+    background-color: #fff3cd !important;
+}
+.alert-warning {
+    border-left: 4px solid #ffc107;
+}
+.alert .btn-warning {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #000;
+}
+.alert .btn-outline-warning {
+    color: #d39e00;
+    border-color: #d39e00;
+}
+.alert .btn-outline-warning:hover {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #000;
 }
 </style>
 

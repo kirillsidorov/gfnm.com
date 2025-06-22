@@ -39,7 +39,8 @@ class Restaurants extends BaseController
         // Получаем рестораны с фильтрацией
         $builder = $this->restaurantModel->select('restaurants.*, cities.name as city_name')
                                        ->join('cities', 'cities.id = restaurants.city_id')
-                                       ->where('restaurants.is_active', 1);
+                                       ->where('restaurants.is_active', 1)
+                                       ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)');
 
         if ($cityId) {
             $builder->where('restaurants.city_id', $cityId);
@@ -161,6 +162,7 @@ class Restaurants extends BaseController
                                                    ->where('restaurants.city_id', $restaurant['city_id'])
                                                    ->where('restaurants.id !=', $id)
                                                    ->where('restaurants.is_active', 1)
+                                                   ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)')
                                                    ->orderBy('restaurants.rating', 'DESC')
                                                    ->limit(4)
                                                    ->findAll();
@@ -204,6 +206,7 @@ class Restaurants extends BaseController
                                                 ->where('restaurants.city_id', $restaurant['city_id'])
                                                 ->where('restaurants.id !=', $restaurant['id'])
                                                 ->where('restaurants.is_active', 1)
+                                                ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)')
                                                 ->orderBy('restaurants.rating', 'DESC')
                                                 ->limit(4)
                                                 ->findAll();
@@ -248,6 +251,7 @@ class Restaurants extends BaseController
             ->where('restaurants.city_id', $restaurant['city_id'])
             ->where('restaurants.id !=', $restaurant['id'])
             ->where('restaurants.is_active', 1)
+            ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)')
             ->orderBy('restaurants.rating', 'DESC')
             ->limit(4)
             ->findAll();
@@ -294,7 +298,8 @@ class Restaurants extends BaseController
         $builder = $this->restaurantModel->select('restaurants.*, cities.name as city_name')
                                        ->join('cities', 'cities.id = restaurants.city_id')
                                        ->where('restaurants.city_id', $cityId)
-                                       ->where('restaurants.is_active', 1);
+                                       ->where('restaurants.is_active', 1)
+                                       ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)');
 
         if ($priceLevel) {
             $builder->where('restaurants.price_level', $priceLevel);
@@ -381,7 +386,8 @@ class Restaurants extends BaseController
         $builder = $this->restaurantModel->select('restaurants.*, cities.name as city_name')
                                     ->join('cities', 'cities.id = restaurants.city_id')
                                     ->whereIn('restaurants.city_id', $cityIds)
-                                    ->where('restaurants.is_active', 1);
+                                    ->where('restaurants.is_active', 1)
+                                    ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)');
 
         if ($priceLevel) {
             $builder->where('restaurants.price_level', $priceLevel);
@@ -509,7 +515,8 @@ class Restaurants extends BaseController
     $builder = $this->restaurantModel->select('restaurants.*, cities.name as city_name')
                                    ->join('cities', 'cities.id = restaurants.city_id')
                                    ->whereIn('restaurants.city_id', [4, 7]) // Brooklyn и Manhattan
-                                   ->where('restaurants.is_active', 1);
+                                   ->where('restaurants.is_active', 1)
+                                   ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)');
 
     if ($boroughFilter) {
         $builder->where('restaurants.city_id', $boroughFilter);
@@ -594,8 +601,9 @@ class Restaurants extends BaseController
                 + sin(radians(?)) 
                 * sin(radians(restaurants.latitude)))) AS distance 
                 FROM restaurants 
-                LEFT JOIN cities ON cities.id = restaurants.city_id
+                LEFT JOIN cities ON cities.id = restaurants.city_id 
                 WHERE restaurants.is_active = 1 
+                AND (restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1) 
                 AND restaurants.latitude IS NOT NULL 
                 AND restaurants.longitude IS NOT NULL";
 
@@ -653,7 +661,8 @@ class Restaurants extends BaseController
         $builder = $this->restaurantModel->select('restaurants.*, cities.name as city_name')
                                     ->join('cities', 'cities.id = restaurants.city_id')
                                     ->where('cities.state', $state)
-                                    ->where('restaurants.is_active', 1);
+                                    ->where('restaurants.is_active', 1)
+                                    ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)');
 
         if ($priceLevel) {
             $builder->where('restaurants.price_level', $priceLevel);
@@ -709,7 +718,8 @@ class Restaurants extends BaseController
         // Получаем рестораны с фильтрацией
         $builder = $this->restaurantModel->select('restaurants.*, cities.name as city_name, cities.slug as city_slug')
                                     ->join('cities', 'cities.id = restaurants.city_id')
-                                    ->where('restaurants.is_active', 1);
+                                    ->where('restaurants.is_active', 1)
+                                    ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)');
 
         if ($cityId) {
             $builder->where('restaurants.city_id', $cityId);
@@ -847,6 +857,17 @@ class Restaurants extends BaseController
         // Каскадный поиск
         $searchResult = $this->findRestaurantsCascadeUniversal($city, $priceLevel, $sortBy);
 
+        if (!empty($searchResult['restaurants'])) {
+                $filteredRestaurants = [];
+                foreach ($searchResult['restaurants'] as $restaurant) {
+                    // Включаем только грузинские (1) и неопределенные (NULL), исключаем неграузинские (0)
+                    if ($restaurant['is_georgian'] !== 0) {
+                        $filteredRestaurants[] = $restaurant;
+                    }
+                }
+                $searchResult['restaurants'] = $filteredRestaurants;
+            }
+
         $data = [
             'title' => 'Georgian Restaurants in ' . $city['name'] . ' - Find Authentic Georgian Food',
             'meta_description' => 'Find the best Georgian restaurants in ' . $city['name'] . '. Authentic khachapuri, khinkali and traditional Georgian cuisine.',
@@ -880,7 +901,8 @@ class Restaurants extends BaseController
         $builder = $this->restaurantModel->select('restaurants.*, cities.name as city_name')
                                     ->join('cities', 'cities.id = restaurants.city_id')
                                     ->where('restaurants.city_id', $city['id'])
-                                    ->where('restaurants.is_active', 1);
+                                    ->where('restaurants.is_active', 1)
+                                    ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)');
 
         if ($priceLevel) {
             $builder->where('restaurants.price_level', $priceLevel);
@@ -998,6 +1020,7 @@ class Restaurants extends BaseController
             ->where('restaurants.slug', $restaurantSlug)
             ->where('restaurants.city_id', $city['id'])
             ->where('restaurants.is_active', 1)
+            ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)')
             ->first();
         
         if (!$restaurant) {
@@ -1016,6 +1039,7 @@ class Restaurants extends BaseController
             ->where('restaurants.city_id', $restaurant['city_id'])
             ->where('restaurants.id !=', $restaurant['id'])
             ->where('restaurants.is_active', 1)
+            ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)')
             ->orderBy('restaurants.rating', 'DESC')
             ->limit(4)
             ->findAll();
@@ -1395,6 +1419,7 @@ class Restaurants extends BaseController
                                                 ->where('restaurants.city_id', $restaurant['city_id'])
                                                 ->where('restaurants.id !=', $id)
                                                 ->where('restaurants.is_active', 1)
+                                                ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)')
                                                 ->orderBy('restaurants.rating', 'DESC')
                                                 ->limit(4)
                                                 ->findAll();

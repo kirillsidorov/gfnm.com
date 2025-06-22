@@ -465,14 +465,16 @@ class Admin extends BaseController
             'rating' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[5]',
             'price_level' => 'permit_empty|integer|in_list[0,1,2,3,4]',
             'is_active' => 'required|in_list[0,1]',
-            'description' => 'permit_empty|max_length[2000]'
+            'description' => 'permit_empty|max_length[2000]',
+            'is_georgian' => 'permit_empty|in_list[0,1]'
         ];
 
         $validationMessages = [
             'slug.regex_match' => 'Slug can only contain lowercase letters, numbers, and hyphens',
             'seo_url.regex_match' => 'SEO URL can only contain lowercase letters, numbers, and hyphens',
             'rating.greater_than_equal_to' => 'Rating must be between 0 and 5',
-            'rating.less_than_equal_to' => 'Rating must be between 0 and 5'
+            'rating.less_than_equal_to' => 'Rating must be between 0 and 5',
+            'is_georgian.in_list' => 'Значение должно быть 0 (не грузинский) или 1 (грузинский)'
         ];
 
         if (!$this->validate($validationRules, $validationMessages)) {
@@ -490,7 +492,8 @@ class Admin extends BaseController
             'rating' => $this->request->getPost('rating') ?: null,
             'price_level' => $this->request->getPost('price_level') ?: 0,
             'is_active' => $this->request->getPost('is_active'),
-            'description' => $this->request->getPost('description') ?: null
+            'description' => $this->request->getPost('description') ?: null,
+            'is_georgian' => $this->request->getPost('is_georgian') !== '' ? (int)$this->request->getPost('is_georgian') : null
         ];
 
         // Проверяем уникальность seo_url если указан (slug не проверяем)

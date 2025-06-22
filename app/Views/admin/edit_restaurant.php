@@ -132,6 +132,48 @@
                                     </option>
                                 </select>
                             </div>
+                            <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="is_georgian" class="form-label">
+                                    <strong>🇬🇪 Грузинский ресторан?</strong>
+                                </label>
+                                <select name="is_georgian" id="is_georgian" class="form-select">
+                                    <option value="">-- Не проверен --</option>
+                                    <option value="1" <?= old('is_georgian', $restaurant['is_georgian'] ?? '') == '1' ? 'selected' : '' ?>>
+                                        ✅ Да, грузинский ресторан
+                                    </option>
+                                    <option value="0" <?= old('is_georgian', $restaurant['is_georgian'] ?? '') == '0' ? 'selected' : '' ?>>
+                                        ❌ Нет, не грузинский
+                                    </option>
+                                </select>
+                                <div class="form-text">
+                                    Отметьте, является ли этот ресторан действительно грузинским
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <!-- Можно оставить пустым или добавить дополнительную информацию -->
+                                <?php if (isset($restaurant) && $restaurant['is_georgian'] !== null): ?>
+                                    <label class="form-label">Статус верификации</label>
+                                    <div class="mt-2">
+                                        <?php if ($restaurant['is_georgian'] == 1): ?>
+                                            <span class="badge bg-success fs-6">
+                                                <i class="fas fa-check-circle me-1"></i>Подтвержден как грузинский
+                                            </span>
+                                        <?php elseif ($restaurant['is_georgian'] == 0): ?>
+                                            <span class="badge bg-danger fs-6">
+                                                <i class="fas fa-times-circle me-1"></i>Отмечен как НЕ грузинский
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="mt-4">
+                                        <span class="badge bg-warning fs-6">
+                                            <i class="fas fa-question-circle me-1"></i>Требует проверки
+                                        </span>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                         </div>
 
                         <div class="mb-3">

@@ -18,7 +18,7 @@ class RestaurantModel extends Model
         // Основные поля (существующие)
         'name', 'original_title', 'slug', 'seo_url', 'description', 'category',
         'address', 'phone', 'website', 'rating', 'price_level', 'google_place_id', 
-        'hours', 'is_active', 'city_id', 'latitude', 'longitude',
+        'hours', 'is_active', 'city_id', 'latitude', 'longitude', 'is_georgian',
         
         // Новые идентификаторы DataForSEO
         'cid', 'feature_id',
@@ -134,6 +134,7 @@ class RestaurantModel extends Model
             FROM restaurants r
             LEFT JOIN cities c ON r.city_id = c.id
             WHERE r.is_active = 1
+            AND (r.is_georgian IS NULL OR r.is_georgian = 1)
             AND r.latitude IS NOT NULL 
             AND r.longitude IS NOT NULL
         ";
@@ -218,7 +219,8 @@ class RestaurantModel extends Model
     {
         $builder = $this->select('restaurants.*, cities.name as city_name, cities.slug as city_slug')
                        ->join('cities', 'cities.id = restaurants.city_id', 'left')
-                       ->where('restaurants.is_active', 1);
+                       ->where('restaurants.is_active', 1)
+                       ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)');
         
         // Текстовый поиск
         if (!empty($params['search'])) {
@@ -299,6 +301,7 @@ class RestaurantModel extends Model
                    ->join('cities', 'cities.id = restaurants.city_id')
                    ->where('restaurants.city_id', $cityId)
                    ->where('restaurants.is_active', 1)
+                   ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)')
                    ->orderBy('restaurants.rating', 'DESC')
                    ->orderBy('restaurants.rating_count', 'DESC')
                    ->findAll();
@@ -309,7 +312,8 @@ class RestaurantModel extends Model
         $builder = $this->select('restaurants.*, cities.name as city_name, cities.slug as city_slug')
                        ->join('cities', 'cities.id = restaurants.city_id');
         
-        $builder->where('restaurants.is_active', 1);
+        $builder->where('restaurants.is_active', 1)
+                ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)');
         
         if ($cityId) {
             $builder->where('restaurants.city_id', $cityId);
@@ -343,6 +347,7 @@ class RestaurantModel extends Model
         $builder = $this->select('restaurants.*, cities.name as city_name')
                        ->join('cities', 'cities.id = restaurants.city_id')
                        ->where('restaurants.is_active', 1)
+                       ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)')
                        ->orderBy('restaurants.rating', 'DESC')
                        ->orderBy('restaurants.rating_count', 'DESC');
         
@@ -358,6 +363,7 @@ class RestaurantModel extends Model
         return $this->select('restaurants.*, cities.name as city_name')
                    ->join('cities', 'cities.id = restaurants.city_id')
                    ->where('restaurants.is_active', 1)
+                   ->where('(restaurants.is_georgian IS NULL OR restaurants.is_georgian = 1)')
                    ->where('restaurants.rating >=', 4.0)
                    ->orderBy('restaurants.rating', 'DESC')
                    ->orderBy('restaurants.rating_count', 'DESC')

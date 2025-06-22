@@ -28,8 +28,8 @@ $routes->get('search', 'Home::search');
 
 // ИСПРАВЛЕНО: Новая правильная логика маршрутов
 $routes->get('georgian-restaurant-near-me', 'MapController::nearMe');  
-$routes->get('restaurants', 'RestaurantsEnhance::browse');                   
-$routes->get('georgian-restaurant', 'RestaurantsEnhance::browse');          
+$routes->get('restaurants', 'Restaurants::browse');                   
+$routes->get('georgian-restaurant', 'Restaurants::browse');          
 
 // Карта (можно оставить отдельно или сделать редирект)
 $routes->get('map', 'MapController::index');
