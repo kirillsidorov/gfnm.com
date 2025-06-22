@@ -30,9 +30,41 @@
                 <li><a class="dropdown-item" href="<?= base_url('admin/google-photos') ?>">
                     <i class="fab fa-google me-1"></i>Google Photos
                 </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="#" onclick="autoDetectTypes()">
+                    <i class="fas fa-magic me-1"></i>Автоопределение типов
+                </a></li>
             </ul>
         </div>
     </div>
+
+    <!-- Статистическая панель -->
+    <?php if (isset($stats)): ?>
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex flex-wrap gap-2">
+                <span class="badge bg-light text-dark fs-6 py-2 px-3">
+                    <i class="fas fa-utensils me-1"></i>Всего: <?= $stats['total_all'] ?? 0 ?>
+                </span>
+                <a href="<?= base_url('admin/restaurants') ?>" 
+                   class="badge bg-<?= ($filters['status'] ?? 'active') === 'active' ? 'success' : 'outline-success' ?> text-decoration-none fs-6 py-2 px-3">
+                    <i class="fas fa-check me-1"></i>Активных: <?= $stats['total_active'] ?? 0 ?>
+                </a>
+                <a href="<?= base_url('admin/restaurants?' . http_build_query(array_merge($filters, ['status' => 'inactive']))) ?>" 
+                   class="badge bg-<?= ($filters['status'] ?? '') === 'inactive' ? 'secondary' : 'outline-secondary' ?> text-decoration-none fs-6 py-2 px-3">
+                    <i class="fas fa-pause me-1"></i>Неактивных: <?= $stats['total_inactive'] ?? 0 ?>
+                </a>
+                
+                <?php if (($filters['status'] ?? 'active') !== '' || !$show_all): ?>
+                <a href="<?= base_url('admin/restaurants?show_all=1') ?>" 
+                   class="badge bg-info text-decoration-none fs-6 py-2 px-3">
+                    <i class="fas fa-eye me-1"></i>Показать все
+                </a>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- Фильтры поиска -->
     <div class="card shadow mb-4">
@@ -44,7 +76,7 @@
         <div class="card-body">
             <form method="GET" id="filterForm" class="row g-3">
                 <!-- Поиск по тексту -->
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label for="search" class="form-label">Поиск</label>
                     <div class="input-group">
                         <input type="text" class="form-control" id="search" name="search" 
@@ -70,16 +102,38 @@
                     </select>
                 </div>
 
-                <!-- Статус активности -->
+                <!-- Тип ресторана (3 состояния) -->
+                <div class="col-md-2">
+                    <label for="restaurant_type" class="form-label">Тип</label>
+                    <select class="form-select" name="restaurant_type" id="restaurant_type">
+                        <option value="">Все типы</option>
+                        <option value="georgian" <?= ($filters['restaurant_type'] ?? '') === 'georgian' ? 'selected' : '' ?>>
+                            🇬🇪 Грузинские
+                        </option>
+                        <option value="non_georgian" <?= ($filters['restaurant_type'] ?? '') === 'non_georgian' ? 'selected' : '' ?>>
+                            🍽️ Обычные
+                        </option>
+                        <option value="undetermined" <?= ($filters['restaurant_type'] ?? '') === 'undetermined' ? 'selected' : '' ?>>
+                            ❓ Не определено
+                        </option>
+                        <option value="auto_detected" <?= ($filters['restaurant_type'] ?? '') === 'auto_detected' ? 'selected' : '' ?>>
+                            ⚠️ Требует проверки
+                        </option>
+                    </select>
+                </div>
+
+                <!-- Статус активности - ИСПРАВЛЕНО: активные по умолчанию -->
                 <div class="col-md-2">
                     <label for="status" class="form-label">Статус</label>
                     <select class="form-select" name="status" id="status">
-                        <option value="">Все</option>
-                        <option value="active" <?= ($filters['status'] ?? '') === 'active' ? 'selected' : '' ?>>
-                            Активные
+                        <option value="active" <?= ($filters['status'] ?? 'active') === 'active' ? 'selected' : '' ?>>
+                            ✅ Активные
                         </option>
                         <option value="inactive" <?= ($filters['status'] ?? '') === 'inactive' ? 'selected' : '' ?>>
-                            Неактивные
+                            ⏸️ Неактивные
+                        </option>
+                        <option value="" <?= empty($filters['status']) && $show_all ? 'selected' : '' ?>>
+                            🔍 Все
                         </option>
                     </select>
                 </div>
@@ -105,7 +159,7 @@
                 </div>
 
                 <!-- Кнопки действий -->
-                <div class="col-md-2 d-flex align-items-end">
+                <div class="col-md-1 d-flex align-items-end">
                     <div class="btn-group w-100">
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-search"></i>
@@ -118,19 +172,71 @@
             </form>
 
             <!-- Быстрые фильтры -->
-            <?php if (!empty(array_filter($filters))): ?>
+            <?php if (!empty(array_filter($filters)) || $show_all): ?>
                 <div class="mt-3">
-                    <span class="text-muted me-2">Активные фильтры:</span>
-                    <?php foreach ($filters as $key => $value): ?>
-                        <?php if (!empty($value)): ?>
-                            <span class="badge bg-primary me-1">
-                                <?= ucfirst(str_replace('_', ' ', $key)) ?>: <?= esc($value) ?>
-                            </span>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="text-muted me-2">Быстрые действия:</span>
+                        
+                        <!-- Фильтры типов -->
+                        <?php if (empty($filters['restaurant_type'])): ?>
+                            <div class="btn-group btn-group-sm">
+                                <a href="<?= base_url('admin/restaurants?' . http_build_query(array_merge($filters, ['restaurant_type' => 'georgian']))) ?>" 
+                                   class="btn btn-outline-success btn-sm">
+                                    🇬🇪 Только грузинские
+                                </a>
+                                <a href="<?= base_url('admin/restaurants?' . http_build_query(array_merge($filters, ['restaurant_type' => 'undetermined']))) ?>" 
+                                   class="btn btn-outline-warning btn-sm">
+                                    ❓ Требуют проверки
+                                </a>
+                            </div>
                         <?php endif; ?>
-                    <?php endforeach; ?>
-                    <a href="<?= base_url('admin/restaurants') ?>" class="btn btn-outline-secondary btn-sm ms-2">
-                        <i class="fas fa-times me-1"></i>Сбросить все
-                    </a>
+                        
+                        <!-- Автоопределение типов -->
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="autoDetectTypes()">
+                            <i class="fas fa-magic me-1"></i>Автоопределение типов
+                        </button>
+                        
+                        <!-- Сброс фильтров -->
+                        <a href="<?= base_url('admin/restaurants') ?>" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-times me-1"></i>Сбросить
+                        </a>
+                    </div>
+                    
+                    <!-- Активные фильтры -->
+                    <div class="mt-2">
+                        <small class="text-muted">Активные фильтры:</small>
+                        <?php foreach ($filters as $key => $value): ?>
+                            <?php if (!empty($value)): ?>
+                                <span class="badge bg-primary me-1">
+                                    <?php
+                                    $filterDisplayNames = [
+                                        'search' => 'Поиск: ' . $value,
+                                        'status' => $value === 'active' ? '✅ Активные' : ($value === 'inactive' ? '⏸️ Неактивные' : $value),
+                                        'restaurant_type' => [
+                                            'georgian' => '🇬🇪 Грузинские',
+                                            'non_georgian' => '🍽️ Обычные', 
+                                            'undetermined' => '❓ Не определены',
+                                            'auto_detected' => '⚠️ Требуют проверки'
+                                        ][$value] ?? $value,
+                                        'data_filter' => [
+                                            'no_coords' => 'Без координат',
+                                            'no_photos' => 'Без фото',
+                                            'no_place_id' => 'Без Place ID',
+                                            'has_website' => 'С сайтом'
+                                        ][$value] ?? $value,
+                                        'city_id' => 'Город: ' . ($cities[array_search($value, array_column($cities, 'id'))]['name'] ?? $value)
+                                    ];
+                                    
+                                    echo $filterDisplayNames[$key] ?? ucfirst($key) . ': ' . $value;
+                                    ?>
+                                </span>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                        
+                        <?php if ($show_all): ?>
+                            <span class="badge bg-info me-1">🔍 Показать все</span>
+                        <?php endif; ?>
+                    </div>
                 </div>
             <?php endif; ?>
         </div>
@@ -159,17 +265,48 @@
             </div>
         </div>
     </div>
-
+    
     <!-- Таблица ресторанов -->
     <div class="card shadow">
         <div class="card-header py-3">
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="m-0 font-weight-bold text-primary">
-                    Список ресторанов 
+                    <?php
+                    // Определяем текст заголовка в зависимости от фильтров
+                    $headerText = 'Список ресторанов';
+                    
+                    if (($filters['status'] ?? 'active') === 'active') {
+                        $headerText = '✅ Активные рестораны';
+                    } elseif (($filters['status'] ?? '') === 'inactive') {
+                        $headerText = '⏸️ Неактивные рестораны';
+                    } elseif (empty($filters['status']) && $show_all) {
+                        $headerText = '🔍 Все рестораны';
+                    }
+                    
+                    // Добавляем тип если фильтр активен
+                    if (!empty($filters['restaurant_type'])) {
+                        $typeLabels = [
+                            'georgian' => '🇬🇪 грузинские',
+                            'non_georgian' => '🍽️ обычные',
+                            'undetermined' => '❓ неопределенные',
+                            'auto_detected' => '⚠️ требующие проверки'
+                        ];
+                        
+                        $typeLabel = $typeLabels[$filters['restaurant_type']] ?? $filters['restaurant_type'];
+                        $headerText .= " ({$typeLabel})";
+                    }
+                    
+                    echo $headerText;
+                    ?>
+                    
                     <?php if (isset($total_restaurants)): ?>
-                        (<?= count($restaurants) ?> из <?= $total_restaurants ?>)
+                        <small class="text-muted ms-2">
+                            (<?= count($restaurants) ?> из <?= $total_restaurants ?>)
+                        </small>
                     <?php else: ?>
-                        (<?= count($restaurants) ?>)
+                        <small class="text-muted ms-2">
+                            (<?= count($restaurants) ?>)
+                        </small>
                     <?php endif; ?>
                 </h6>
                 <div class="btn-group btn-group-sm">
@@ -193,7 +330,7 @@
                                 </th>
                                 <th>Ресторан</th>
                                 <th>Город</th>
-                                <th>Рейтинг</th>
+                                <th>Тип</th>
                                 <th>Данные</th>
                                 <th>Статус</th>
                                 <th>Дата</th>
@@ -242,16 +379,92 @@
                                         <?php endif; ?>
                                     </td>
                                     <td>
+                                        <?php
+                                        // Определяем тип ресторана по полю is_georgian
+                                        $isGeorgian = $restaurant['is_georgian'];
+                                        
+                                        if ($isGeorgian === '1' || $isGeorgian === 1) {
+                                            // Точно грузинский
+                                            echo '<span class="badge bg-success restaurant-type-badge" 
+                                                        data-restaurant-id="' . $restaurant['id'] . '" 
+                                                        data-current-type="georgian" 
+                                                        title="Подтверждено как грузинский ресторан. Кликните для изменения." 
+                                                        style="cursor: pointer;">
+                                                    <i class="fas fa-flag"></i> Грузинский
+                                                  </span>';
+                                        } elseif ($isGeorgian === '0' || $isGeorgian === 0) {
+                                            // Точно не грузинский
+                                            echo '<span class="badge bg-secondary restaurant-type-badge" 
+                                                        data-restaurant-id="' . $restaurant['id'] . '" 
+                                                        data-current-type="non_georgian" 
+                                                        title="Подтверждено как обычный ресторан. Кликните для изменения." 
+                                                        style="cursor: pointer;">
+                                                    <i class="fas fa-times"></i> Обычный
+                                                  </span>';
+                                        } else {
+                                            // Не определено (null) - показываем автоматическое определение
+                                            $autoDetected = false;
+                                            $georgianIndicators = [];
+                                            
+                                            // Проверяем категорию
+                                            $category = strtolower($restaurant['category'] ?? '');
+                                            if (strpos($category, 'georgian') !== false || strpos($category, 'грузин') !== false) {
+                                                $autoDetected = true;
+                                                $georgianIndicators[] = 'категория';
+                                            }
+                                            
+                                            // Проверяем название
+                                            $name = strtolower($restaurant['name'] ?? '');
+                                            $georgianKeywords = ['georgian', 'georgia', 'tbilisi', 'khachapuri', 'khinkali', 'adjarian', 'supra', 'caucas', 'грузин', 'тбилиси', 'хачапури', 'хинкали'];
+                                            foreach ($georgianKeywords as $keyword) {
+                                                if (strpos($name, $keyword) !== false) {
+                                                    $autoDetected = true;
+                                                    $georgianIndicators[] = 'название';
+                                                    break;
+                                                }
+                                            }
+                                            
+                                            // Проверяем описание
+                                            $description = strtolower($restaurant['description'] ?? '');
+                                            foreach ($georgianKeywords as $keyword) {
+                                                if (strpos($description, $keyword) !== false) {
+                                                    $autoDetected = true;
+                                                    if (!in_array('описание', $georgianIndicators)) {
+                                                        $georgianIndicators[] = 'описание';
+                                                    }
+                                                    break;
+                                                }
+                                            }
+                                            
+                                            if ($autoDetected) {
+                                                echo '<span class="badge bg-warning text-dark restaurant-type-badge" 
+                                                            data-restaurant-id="' . $restaurant['id'] . '" 
+                                                            data-current-type="auto_detected" 
+                                                            title="Автоматически определен как грузинский по: ' . implode(', ', $georgianIndicators) . '. Кликните для подтверждения." 
+                                                            style="cursor: pointer;">
+                                                        <i class="fas fa-question"></i> Возможно грузинский
+                                                      </span>';
+                                            } else {
+                                                echo '<span class="badge bg-light text-dark restaurant-type-badge" 
+                                                            data-restaurant-id="' . $restaurant['id'] . '" 
+                                                            data-current-type="undetermined" 
+                                                            title="Тип не определен. Кликните для установки типа." 
+                                                            style="cursor: pointer;">
+                                                        <i class="fas fa-question-circle"></i> Не определен
+                                                      </span>';
+                                            }
+                                        }
+                                        ?>
+                                        
+                                        <!-- Показываем рейтинг под типом, если есть -->
                                         <?php if (!empty($restaurant['rating'])): ?>
                                             <?php 
                                             $rating = floatval($restaurant['rating']);
                                             $badge_class = $rating >= 4.5 ? 'success' : ($rating >= 4.0 ? 'warning' : 'secondary');
                                             ?>
-                                            <span class="badge bg-<?= $badge_class ?>">
-                                                <i class="fas fa-star"></i> <?= number_format($rating, 1) ?>
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="text-muted">—</span>
+                                            <br><small class="badge bg-<?= $badge_class ?> bg-opacity-75">
+                                                <i class="fas fa-star fa-sm"></i> <?= number_format($rating, 1) ?>
+                                            </small>
                                         <?php endif; ?>
                                         
                                         <!-- Уровень цен -->
@@ -284,7 +497,7 @@
                                                 </span>
                                             <?php endif; ?>
 
-                                            <!-- Проверка фотографий (если есть доступ к модели) -->
+                                            <!-- Проверка фотографий -->
                                             <?php 
                                             $hasPhotos = false;
                                             try {
@@ -436,8 +649,12 @@ $(document).ready(function() {
     });
     
     // Автоматическая отправка формы при изменении фильтров
-    $('#city, #status, #data_filter').on('change', function() {
-        $('#filterForm').submit();
+    $('#city, #status, #data_filter, #restaurant_type').on('change', function() {
+        // Убираем параметр show_all при изменении фильтров
+        const form = $('#filterForm');
+        const currentAction = form.attr('action') || window.location.pathname;
+        form.attr('action', currentAction.split('?')[0]);
+        form.submit();
     });
     
     // Поиск по Enter
@@ -454,7 +671,132 @@ $(document).ready(function() {
             $('#filterForm').submit();
         }
     });
+
+    // Обработчик клика по бейджам типа ресторана
+    $(document).on('click', '.restaurant-type-badge', function(e) {
+        e.preventDefault();
+        
+        const restaurantId = $(this).data('restaurant-id');
+        const currentType = $(this).data('current-type');
+        
+        // Показываем контекстное меню
+        showTypeChangeMenu(restaurantId, currentType, e.pageX, e.pageY);
+    });
+    
+    // Скрываем контекстное меню при клике вне его
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('.type-context-menu').length) {
+            $('.type-context-menu').remove();
+        }
+    });
 });
+
+// Показ контекстного меню для изменения типа
+function showTypeChangeMenu(restaurantId, currentType, x, y) {
+    // Удаляем существующие меню
+    $('.type-context-menu').remove();
+    
+    const menu = $(`
+        <div class="type-context-menu" style="position: fixed; top: ${y}px; left: ${x}px; z-index: 9999;">
+            <div class="card shadow">
+                <div class="card-body p-2">
+                    <div class="btn-group-vertical w-100">
+                        <button type="button" class="btn btn-sm btn-success" onclick="setRestaurantType(${restaurantId}, 'georgian')" ${currentType === 'georgian' ? 'disabled' : ''}>
+                            <i class="fas fa-flag"></i> Грузинский
+                        </button>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="setRestaurantType(${restaurantId}, 'non_georgian')" ${currentType === 'non_georgian' ? 'disabled' : ''}>
+                            <i class="fas fa-times"></i> Обычный
+                        </button>
+                        <button type="button" class="btn btn-sm btn-light" onclick="setRestaurantType(${restaurantId}, 'undetermined')" ${currentType === 'undetermined' ? 'disabled' : ''}>
+                            <i class="fas fa-question-circle"></i> Не определен
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `);
+    
+    $('body').append(menu);
+    
+    // Автоматически скрываем через 5 секунд
+    setTimeout(() => {
+        menu.fadeOut(() => menu.remove());
+    }, 5000);
+}
+
+// Быстрое изменение типа ресторана
+function setRestaurantType(restaurantId, type) {
+    $('.type-context-menu').remove();
+    
+    $.ajax({
+        url: `<?= base_url('admin/restaurants/set-type/') ?>${restaurantId}`,
+        method: 'POST',
+        data: {
+            type: type,
+            '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                showAlert('success', response.message);
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert('danger', response.message || 'Ошибка изменения типа');
+            }
+        },
+        error: function() {
+            showAlert('danger', 'Ошибка запроса');
+        }
+    });
+}
+
+// Автоматическое определение типов
+function autoDetectTypes() {
+    if (!confirm('Автоматически определить типы ресторанов на основе названий и категорий?')) {
+        return;
+    }
+    
+    $.ajax({
+        url: '<?= base_url('admin/restaurants/auto-detect-types') ?>',
+        method: 'POST',
+        data: {
+            '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
+        },
+        dataType: 'json',
+        beforeSend: function() {
+            showAlert('info', 'Выполняется автоматическое определение типов...');
+        },
+        success: function(response) {
+            if (response.success) {
+                showAlert('success', response.message);
+                
+                // Показываем детальную статистику
+                if (response.stats) {
+                    const stats = response.stats;
+                    const details = `
+                        <div class="mt-2">
+                            <small>
+                                Обработано: ${stats.total_processed}<br>
+                                Обновлено: ${stats.updated}<br>
+                                Найдено грузинских: ${stats.georgian_found}<br>
+                                Осталось неопределенных: ${stats.remaining_undetermined}
+                            </small>
+                        </div>
+                    `;
+                    
+                    $('.alert').last().append(details);
+                }
+                
+                setTimeout(() => location.reload(), 3000);
+            } else {
+                showAlert('danger', response.message || 'Ошибка автоматического определения');
+            }
+        },
+        error: function() {
+            showAlert('danger', 'Ошибка запроса автоматического определения');
+        }
+    });
+}
 
 // Обновление состояния массовых операций
 function updateBulkActions() {
@@ -522,11 +864,13 @@ function bulkAction(action) {
         method: 'POST',
         data: {
             action: action,
-            ids: selectedIds
+            ids: selectedIds,
+            '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
         },
         dataType: 'json',
         beforeSend: function() {
             $('#bulkActions button').prop('disabled', true);
+            showAlert('info', `Выполняется ${getActionName(action)}...`);
         },
         success: function(response) {
             if (response.success) {
@@ -536,8 +880,15 @@ function bulkAction(action) {
                 showAlert('danger', response.message || 'Произошла ошибка');
             }
         },
-        error: function() {
-            showAlert('danger', 'Ошибка выполнения запроса');
+        error: function(xhr) {
+            let errorMessage = 'Ошибка выполнения запроса';
+            try {
+                const response = JSON.parse(xhr.responseText);
+                errorMessage = response.message || errorMessage;
+            } catch (e) {
+                // Используем стандартное сообщение
+            }
+            showAlert('danger', errorMessage);
         },
         complete: function() {
             $('#bulkActions button').prop('disabled', false);
@@ -565,6 +916,9 @@ function deleteRestaurant(id, name) {
     $.ajax({
         url: `<?= base_url('admin/restaurants/delete/') ?>${id}`,
         method: 'DELETE',
+        data: {
+            '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
+        },
         dataType: 'json',
         success: function(response) {
             if (response.success) {
@@ -585,6 +939,9 @@ function importGooglePhotos(restaurantId) {
     $.ajax({
         url: `<?= base_url('admin/restaurants/') ?>${restaurantId}/import-google-photos`,
         method: 'POST',
+        data: {
+            '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
+        },
         dataType: 'json',
         beforeSend: function() {
             showAlert('info', 'Импорт фотографий...');
@@ -592,6 +949,8 @@ function importGooglePhotos(restaurantId) {
         success: function(response) {
             if (response.success) {
                 showAlert('success', response.message);
+                // Обновляем иконку фотографий в таблице
+                setTimeout(() => location.reload(), 2000);
             } else {
                 showAlert('danger', response.message || 'Ошибка импорта');
             }
@@ -606,11 +965,12 @@ function importGooglePhotos(restaurantId) {
 function showAlert(type, message) {
     const alertClass = `alert-${type}`;
     const iconClass = type === 'success' ? 'check-circle' : 
-                     type === 'danger' ? 'exclamation-circle' : 'info-circle';
+                     type === 'danger' ? 'exclamation-circle' : 
+                     type === 'warning' ? 'exclamation-triangle' : 'info-circle';
     
     const alert = `
         <div class="alert ${alertClass} alert-dismissible fade show position-fixed" 
-             style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+             style="top: 20px; right: 20px; z-index: 9999; min-width: 300px; max-width: 500px;">
             <i class="fas fa-${iconClass} me-2"></i>
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -619,12 +979,14 @@ function showAlert(type, message) {
     
     $('body').append(alert);
     
-    // Автоматическое скрытие через 5 секунд
-    setTimeout(function() {
-        $('.alert').last().fadeOut('slow', function() {
-            $(this).remove();
-        });
-    }, 5000);
+    // Автоматическое скрытие через 5 секунд (кроме ошибок)
+    if (type !== 'danger') {
+        setTimeout(function() {
+            $('.alert').last().fadeOut('slow', function() {
+                $(this).remove();
+            });
+        }, 5000);
+    }
 }
 </script>
 <?= $this->endSection() ?>

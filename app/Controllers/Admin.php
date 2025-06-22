@@ -153,21 +153,53 @@ class Admin extends BaseController
         return redirect()->to('/admin/dashboard');
     }
 
+
     /**
-     * Управление ресторанами
+     * Управление ресторанами - с фильтром активных по умолчанию
      */
     public function restaurants()
     {
+        // Получение фильтров из запроса
         $filters = [
             'search' => $this->request->getGet('search'),
-            'city_id' => $this->request->getGet('city')
+            'city_id' => $this->request->getGet('city'),
+            'status' => $this->request->getGet('status'),
+            'data_filter' => $this->request->getGet('data_filter'),
+            'restaurant_type' => $this->request->getGet('restaurant_type'),
+        ];
+
+        // Параметр показать все
+        $showAll = $this->request->getGet('show_all');
+
+        // ИСПРАВЛЕНО: Если нет фильтра по статусу и нет параметра show_all, по умолчанию показываем только активные
+        if (empty($filters['status']) && !$showAll) {
+            $filters['status'] = 'active';
+        }
+
+        // Получаем рестораны через AdminLibrary с обновленными фильтрами
+        $restaurants = $this->adminLib->getRestaurants($filters, 100);
+        
+        // Получаем города для фильтра
+        $cities = $this->adminLib->getCities();
+        
+        // Подсчитываем общее количество
+        $totalRestaurants = $this->adminLib->getRestaurantsCount($filters);
+        
+        // Статистика для информации
+        $stats = [
+            'total_all' => $this->adminLib->getRestaurantsCount([]), // Все рестораны
+            'total_active' => $this->adminLib->getRestaurantsCount(['status' => 'active']), // Активные
+            'total_inactive' => $this->adminLib->getRestaurantsCount(['status' => 'inactive']), // Неактивные
         ];
 
         $data = [
             'title' => 'Управление ресторанами - Админка',
-            'restaurants' => $this->adminLib->getRestaurants($filters, 100),
-            'cities' => $this->adminLib->getCities(),
-            'filters' => $filters
+            'restaurants' => $restaurants,
+            'cities' => $cities,
+            'filters' => $filters,
+            'total_restaurants' => $totalRestaurants,
+            'stats' => $stats,
+            'show_all' => $showAll // ДОБАВЛЕНО: передаем параметр в представление
         ];
 
         return view('admin/restaurants', $data);
@@ -213,36 +245,250 @@ class Admin extends BaseController
     }
 
     /**
-     * Массовые операции
+     * Массовые операции - ОБНОВЛЕННАЯ ВЕРСИЯ
      */
     public function bulkOperations()
     {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Invalid request']);
+        }
+        
         $action = $this->request->getPost('action');
-        $restaurantIds = $this->request->getPost('restaurant_ids');
+        $restaurantIds = $this->request->getPost('ids');
 
-        if (empty($restaurantIds)) {
-            return redirect()->back()->with('error', 'Рестораны не выбраны');
+        if (empty($restaurantIds) || !is_array($restaurantIds)) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Рестораны не выбраны']);
         }
 
-        $count = $this->adminLib->bulkOperationRestaurants($action, $restaurantIds);
-        
-        if ($count > 0) {
-            return redirect()->back()->with('success', "Операция выполнена для {$count} ресторанов");
-        } else {
-            return redirect()->back()->with('error', 'Ошибка при выполнении операции');
+        // Валидация ID
+        $restaurantIds = array_filter($restaurantIds, 'is_numeric');
+        if (empty($restaurantIds)) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Неверные ID ресторанов']);
+        }
+
+        try {
+            $count = $this->adminLib->bulkOperationRestaurants($action, $restaurantIds);
+            
+            if ($count > 0) {
+                $actionNames = [
+                    'activate' => 'активировано',
+                    'deactivate' => 'деактивировано',
+                    'delete' => 'удалено'
+                ];
+                
+                $actionName = $actionNames[$action] ?? $action;
+                
+                return $this->response->setJSON([
+                    'success' => true,
+                    'message' => "Успешно {$actionName} {$count} ресторан(ов)",
+                    'affected' => $count
+                ]);
+            } else {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Ошибка при выполнении операции'
+                ]);
+            }
+        } catch (\Exception $e) {
+            log_message('error', 'Bulk operation error: ' . $e->getMessage());
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Произошла ошибка: ' . $e->getMessage()
+            ]);
         }
     }
 
     /**
-     * Экспорт данных
+     * Быстрое изменение типа ресторана
+     */
+    public function setRestaurantType($restaurantId)
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'Invalid request']);
+        }
+
+        $restaurantModel = model('RestaurantModel');
+        $restaurant = $restaurantModel->find($restaurantId);
+        
+        if (!$restaurant) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Ресторан не найден'
+            ]);
+        }
+
+        $type = $this->request->getPost('type'); // 'georgian', 'non_georgian', или 'undetermined'
+        
+        $allowedTypes = ['georgian', 'non_georgian', 'undetermined'];
+        if (!in_array($type, $allowedTypes)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Неверный тип ресторана'
+            ]);
+        }
+
+        // Определяем значение для поля is_georgian
+        $isGeorgianValue = null;
+        switch ($type) {
+            case 'georgian':
+                $isGeorgianValue = 1;
+                break;
+            case 'non_georgian':
+                $isGeorgianValue = 0;
+                break;
+            case 'undetermined':
+                $isGeorgianValue = null;
+                break;
+        }
+
+        try {
+            $restaurantModel->update($restaurantId, [
+                'is_georgian' => $isGeorgianValue,
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+
+            $typeLabels = [
+                'georgian' => 'грузинский',
+                'non_georgian' => 'обычный',
+                'undetermined' => 'не определенный'
+            ];
+
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => "Ресторан помечен как {$typeLabels[$type]}",
+                'new_type' => $type
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Ошибка обновления: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Массовое автоматическое определение типов ресторанов
+     */
+    public function autoDetectRestaurantTypes()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'Invalid request']);
+        }
+
+        $restaurantModel = model('RestaurantModel');
+        
+        // Получаем все рестораны с неопределенным типом (is_georgian = NULL)
+        $restaurants = $restaurantModel->where('is_georgian IS NULL')->findAll();
+        
+        $updated = 0;
+        $georgianFound = 0;
+        $nonGeorgianFound = 0;
+
+        foreach ($restaurants as $restaurant) {
+            $autoDetection = $this->adminLib->isGeorgianRestaurantAuto($restaurant);
+            
+            if ($autoDetection['detected']) {
+                // Автоматически помечаем как грузинский
+                $restaurantModel->update($restaurant['id'], [
+                    'is_georgian' => 1,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+                $georgianFound++;
+                $updated++;
+            }
+            // Не помечаем автоматически как не грузинский - оставляем на ручную проверку
+        }
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => "Автоматически определено {$georgianFound} грузинских ресторанов из {$updated} обработанных",
+            'stats' => [
+                'total_processed' => count($restaurants),
+                'updated' => $updated,
+                'georgian_found' => $georgianFound,
+                'non_georgian_found' => $nonGeorgianFound,
+                'remaining_undetermined' => count($restaurants) - $updated
+            ]
+        ]);
+    }
+
+    /**
+     * Экспорт данных - ОБНОВЛЕННАЯ ВЕРСИЯ с фильтрами
      */
     public function export($format = 'csv')
     {
-        if ($format === 'csv') {
-            $this->adminLib->exportRestaurantsCSV();
-        } else {
+        if ($format !== 'csv') {
             return redirect()->back()->with('error', 'Неподдерживаемый формат');
         }
+
+        // Получаем те же фильтры что и в списке
+        $filters = [
+            'search' => $this->request->getGet('search'),
+            'city_id' => $this->request->getGet('city'),
+            'status' => $this->request->getGet('status'),
+            'data_filter' => $this->request->getGet('data_filter'),
+            'restaurant_type' => $this->request->getGet('restaurant_type'), // НОВЫЙ ФИЛЬТР
+        ];
+
+        // Получаем все рестораны с примененными фильтрами (без лимита)
+        $restaurants = $this->adminLib->getRestaurants($filters, 10000); // Большой лимит для экспорта
+
+        // Генерируем CSV
+        $filename = 'restaurants_export_' . date('Y-m-d_H-i-s') . '.csv';
+        
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        
+        $output = fopen('php://output', 'w');
+        
+        // BOM для корректного отображения UTF-8 в Excel
+        fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+        
+        // Заголовки
+        fputcsv($output, [
+            'ID',
+            'Название',
+            'Тип',
+            'Адрес', 
+            'Телефон',
+            'Город',
+            'Категория',
+            'Рейтинг',
+            'Статус',
+            'Google Place ID',
+            'Широта',
+            'Долгота',
+            'Веб-сайт',
+            'Дата создания'
+        ], ';');
+        
+        // Данные
+        foreach ($restaurants as $restaurant) {
+            $isGeorgian = $this->adminLib->isGeorgianRestaurant($restaurant);
+            
+            fputcsv($output, [
+                $restaurant['id'],
+                $restaurant['name'],
+                $isGeorgian ? 'Грузинский' : 'Обычный',
+                $restaurant['address'],
+                $restaurant['phone'],
+                $restaurant['city_name'] ?? '',
+                $restaurant['category'],
+                $restaurant['rating'],
+                $restaurant['is_active'] ? 'Активен' : 'Неактивен',
+                $restaurant['google_place_id'],
+                $restaurant['latitude'],
+                $restaurant['longitude'],
+                $restaurant['website'],
+                $restaurant['created_at']
+            ], ';');
+        }
+        
+        fclose($output);
+        exit;
     }
 
     /**

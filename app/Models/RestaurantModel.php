@@ -396,7 +396,6 @@ class RestaurantModel extends Model
         return $this->select('restaurants.*, cities.name as city_name, cities.state, cities.slug as city_slug')
                    ->join('cities', 'cities.id = restaurants.city_id')
                    ->where('restaurants.seo_url', $seoUrl)
-                   ->where('restaurants.is_active', 1)
                    ->first();
     }
 

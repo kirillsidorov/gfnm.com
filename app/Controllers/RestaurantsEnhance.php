@@ -84,6 +84,14 @@ class RestaurantsEnhance extends BaseController
         if (!$restaurant) {
             throw new \CodeIgniter\Exceptions\PageNotFoundException('Restaurant not found');
         }
+        
+        if (!$restaurant['is_active']) {
+            // Логируем попытку доступа к неактивному ресторану
+            log_message('info', "Redirect to home: inactive restaurant '{$restaurant['name']}' (ID: {$restaurant['id']})");
+            
+            // Простой редирект на главную страницу
+            return redirect()->to(base_url());
+        }
 
         // Получаем фотографии ресторана
         $photos = $this->photoModel->getRestaurantPhotos($restaurant['id']);

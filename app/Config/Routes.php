@@ -14,7 +14,7 @@ $routes->get('privacy', 'Pages::privacy');
 $routes->get('terms', 'Pages::terms');
 
 
-$routes->get('restaurant/(:segment)', 'RestaurantsEnhance::view/$1');
+//$routes->get('restaurant/(:segment)', 'RestaurantsEnhance::view/$1');
 
 // Bug Report routes
 $routes->get('bug-report', 'BugReport::index');
