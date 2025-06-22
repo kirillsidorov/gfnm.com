@@ -90,6 +90,9 @@ $routes->group('admin', ['filter' => 'adminauth'], function($routes) {
     $routes->get('', 'Admin::index');
     $routes->get('dashboard', 'Admin::dashboard');
     
+    // Очистка кеша
+    $routes->get('clear-cache', 'Admin::clearCache');
+    $routes->post('clear-cache', 'Admin::clearCache');
     // Выход
     $routes->get('logout', 'Admin::logout');
     

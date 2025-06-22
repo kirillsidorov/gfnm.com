@@ -155,6 +155,12 @@
                             </a>
                         </li>
                         
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= base_url('admin/clear-cache') ?>">
+                                <i class="fas fa-memory text-warning me-2"></i>
+                                Cache Management
+                            </a>
+                        </li>
                         <hr class="text-white-50 mx-2">
                         
                         <!-- ВЫХОД -->

@@ -889,6 +889,7 @@ class Restaurants extends BaseController
      */
     private function findRestaurantsCascadeUniversal($city, $priceLevel = null, $sortBy = 'rating')
     {
+        
         // Проверяем кэш
         $cacheKey = "restaurants_cascade_{$city['slug']}_" . md5(serialize([$priceLevel, $sortBy]));
         $cached = cache($cacheKey);

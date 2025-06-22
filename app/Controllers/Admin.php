@@ -2732,4 +2732,93 @@ private function processCsvFile($file)
         }
         return max(0, min(4, intval($priceLevel)));
     }
+
+    /**
+     * Очистка кеша
+     */
+    public function clearCache()
+    {
+        if ($this->request->getMethod() === 'POST') {
+            try {
+                // Очищаем весь кеш
+                cache()->clean();
+                
+                // Можно также очистить кеш CodeIgniter
+                if (function_exists('opcache_reset')) {
+                    opcache_reset();
+                }
+                
+                // Подсчитываем сколько было очищено (приблизительно)
+                $cacheInfo = [
+                    'timestamp' => date('Y-m-d H:i:s'),
+                    'method' => 'manual_admin_clear',
+                    'success' => true
+                ];
+                
+                // Логируем действие
+                log_message('info', 'Admin cache cleared manually from admin panel');
+                
+                return $this->response->setJSON([
+                    'success' => true,
+                    'message' => 'Cache cleared successfully!',
+                    'timestamp' => date('Y-m-d H:i:s'),
+                    'info' => $cacheInfo
+                ]);
+                
+            } catch (\Exception $e) {
+                log_message('error', 'Cache clear failed: ' . $e->getMessage());
+                
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Failed to clear cache: ' . $e->getMessage()
+                ]);
+            }
+        }
+        
+        // GET запрос - показываем страницу управления кешем
+        $data = [
+            'title' => 'Cache Management - Admin',
+            'cache_info' => $this->getCacheInfo()
+        ];
+        
+        return view('admin/cache', $data);
+    }
+
+    /**
+     * Получение информации о кеше
+     */
+    private function getCacheInfo()
+    {
+        $info = [
+            'cache_enabled' => true,
+            'cache_driver' => 'file', // или получить из конфигурации
+            'cache_path' => WRITEPATH . 'cache/',
+            'total_files' => 0,
+            'total_size' => 0,
+            'last_cleared' => null
+        ];
+        
+        try {
+            // Подсчитываем файлы кеша если используется file driver
+            $cachePath = WRITEPATH . 'cache/';
+            if (is_dir($cachePath)) {
+                $files = glob($cachePath . '*');
+                $info['total_files'] = count($files);
+                
+                $totalSize = 0;
+                foreach ($files as $file) {
+                    if (is_file($file)) {
+                        $totalSize += filesize($file);
+                    }
+                }
+                $info['total_size'] = $totalSize;
+                $info['total_size_formatted'] = $this->formatBytes($totalSize);
+            }
+            
+        } catch (\Exception $e) {
+            $info['error'] = $e->getMessage();
+        }
+        
+        return $info;
+    }
 }
