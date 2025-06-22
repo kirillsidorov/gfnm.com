@@ -1,6 +1,6 @@
 <?php
 // =============================================================================
-// НОВЫЙ КОНТРОЛЛЕР: app/Controllers/DataForSeoImport.php
+// ИСПРАВЛЕННЫЙ КОНТРОЛЛЕР: app/Controllers/DataForSeoImport.php
 // =============================================================================
 
 namespace App\Controllers;
@@ -12,9 +12,13 @@ class DataForSeoImport extends BaseController
 {
     protected $importService;
     protected $dataForSeoService;
+    protected $db; // Добавлена переменная для database
     
     public function __construct()
     {
+        // Инициализируем database connection как в других контроллерах
+        $this->db = \Config\Database::connect();
+        
         $this->importService = new DataForSeoImportService();
         $this->dataForSeoService = new DataForSeoService();
     }
@@ -302,7 +306,6 @@ class DataForSeoImport extends BaseController
         }
     }
 
-
     /**
      * Получение времени последнего импорта
      */
@@ -358,72 +361,22 @@ class DataForSeoImport extends BaseController
         }
     }
 
-
-    /**
-     * Поиск по Place ID
-     */
-    public function searchByPlaceId($placeId)
-    {
-        $postData = [
-            [
-                'place_id' => $placeId,
-                'language_name' => 'English'
-            ]
-        ];
-        
-        return $this->makeRequest('/v3/business_data/business_listings/live', $postData);
-    }
-
     /**
      * Поиск Place ID по названию и адресу
      */
-    public function findPlaceId($name, $address)
-    {
-        $query = trim($name . ' ' . $address);
-        
-        $postData = [
-            [
-                'keyword' => $query,
-                'limit' => 5
-            ]
-        ];
-        
-        $result = $this->makeRequest('/v3/business_data/business_listings/search/live', $postData);
-        
-        if ($result['success'] && !empty($result['data'])) {
-            foreach ($result['data'] as $item) {
-                // Ищем наиболее похожий результат
-                if (stripos($item['title'], $name) !== false) {
-                    return [
-                        'success' => true,
-                        'place_id' => $item['place_id']
-                    ];
-                }
-            }
-        }
-        
-        return ['success' => false, 'message' => 'Place ID not found'];
-    }
-
-    /**
-     * Тест подключения к API
-     */
-    public function testConnection()
+    private function findPlaceId($name, $address)
     {
         try {
-            $result = $this->makeRequest('/v3/business_data/business_listings/locations');
+            $result = $this->dataForSeoService->findPlaceId($name, $address);
             
-            return [
-                'success' => true,
-                'message' => 'API connection successful',
-                'available_locations' => count($result['data'] ?? [])
-            ];
+            if ($result['success']) {
+                return $result['place_id'];
+            }
+            
+            return false;
         } catch (\Exception $e) {
-            return [
-                'success' => false,
-                'message' => 'API connection failed: ' . $e->getMessage()
-            ];
+            log_message('error', 'Error finding Place ID: ' . $e->getMessage());
+            return false;
         }
     }
-
 }
