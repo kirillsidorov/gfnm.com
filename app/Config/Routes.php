@@ -59,6 +59,10 @@ $routes->get('khinkali-near-me', function() {
     return redirect()->to(base_url('georgian-restaurant-near-me?q=khinkali'));
 });
 
+$routes->get('chama-mama-catering-restaurant-new-york', function() {
+    return redirect()->to(base_url('chama-mama-catering-restaurant-manhattan'));
+});
+
 // SEO-оптимизированные маршруты для городов
 $routes->get('georgian-restaurants-(:segment)', 'Restaurants::byCitySlugNew/$1');
 

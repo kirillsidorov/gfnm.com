@@ -2070,19 +2070,6 @@ public function findPlaceId()
 }
 
 /**
- * Импорт фотографий из Google Places
- */
-public function importGooglePhotos($restaurantId)
-{
-    // Ваша существующая логика импорта фото
-    return $this->response->setJSON([
-        'success' => true,
-        'message' => 'Функция импорта уже реализована'
-    ]);
-}
-// ДОБАВИТЬ В app/Controllers/Admin.php
-
-/**
  * Обновление ресторана из DataForSEO API
  */
 public function updateFromDataForSEO($restaurantId)

@@ -302,19 +302,6 @@ class DataForSeoImport extends BaseController
         }
     }
 
-    /**
-     * Поиск Place ID по названию и адресу
-     */
-    private function findPlaceId($name, $address)
-    {
-        try {
-            $result = $this->dataForSeoService->findPlaceId($name, $address);
-            return $result['success'] ? $result['place_id'] : null;
-        } catch (\Exception $e) {
-            log_message('error', 'Place ID search error: ' . $e->getMessage());
-            return null;
-        }
-    }
 
     /**
      * Получение времени последнего импорта
@@ -370,75 +357,73 @@ class DataForSeoImport extends BaseController
             log_message('error', 'Failed to log import: ' . $e->getMessage());
         }
     }
-}
 
-// =============================================================================
-// ДОПОЛНЕНИЕ К DataForSeoService: app/Services/DataForSeoService.php
-// =============================================================================
 
-/**
- * Поиск по Place ID
- */
-public function searchByPlaceId($placeId)
-{
-    $postData = [
-        [
-            'place_id' => $placeId,
-            'language_name' => 'English'
-        ]
-    ];
-    
-    return $this->makeRequest('/v3/business_data/business_listings/live', $postData);
-}
+    /**
+     * Поиск по Place ID
+     */
+    public function searchByPlaceId($placeId)
+    {
+        $postData = [
+            [
+                'place_id' => $placeId,
+                'language_name' => 'English'
+            ]
+        ];
+        
+        return $this->makeRequest('/v3/business_data/business_listings/live', $postData);
+    }
 
-/**
- * Поиск Place ID по названию и адресу
- */
-public function findPlaceId($name, $address)
-{
-    $query = trim($name . ' ' . $address);
-    
-    $postData = [
-        [
-            'keyword' => $query,
-            'limit' => 5
-        ]
-    ];
-    
-    $result = $this->makeRequest('/v3/business_data/business_listings/search/live', $postData);
-    
-    if ($result['success'] && !empty($result['data'])) {
-        foreach ($result['data'] as $item) {
-            // Ищем наиболее похожий результат
-            if (stripos($item['title'], $name) !== false) {
-                return [
-                    'success' => true,
-                    'place_id' => $item['place_id']
-                ];
+    /**
+     * Поиск Place ID по названию и адресу
+     */
+    public function findPlaceId($name, $address)
+    {
+        $query = trim($name . ' ' . $address);
+        
+        $postData = [
+            [
+                'keyword' => $query,
+                'limit' => 5
+            ]
+        ];
+        
+        $result = $this->makeRequest('/v3/business_data/business_listings/search/live', $postData);
+        
+        if ($result['success'] && !empty($result['data'])) {
+            foreach ($result['data'] as $item) {
+                // Ищем наиболее похожий результат
+                if (stripos($item['title'], $name) !== false) {
+                    return [
+                        'success' => true,
+                        'place_id' => $item['place_id']
+                    ];
+                }
             }
         }
-    }
-    
-    return ['success' => false, 'message' => 'Place ID not found'];
-}
-
-/**
- * Тест подключения к API
- */
-public function testConnection()
-{
-    try {
-        $result = $this->makeRequest('/v3/business_data/business_listings/locations');
         
-        return [
-            'success' => true,
-            'message' => 'API connection successful',
-            'available_locations' => count($result['data'] ?? [])
-        ];
-    } catch (\Exception $e) {
-        return [
-            'success' => false,
-            'message' => 'API connection failed: ' . $e->getMessage()
-        ];
+        return ['success' => false, 'message' => 'Place ID not found'];
     }
+
+    /**
+     * Тест подключения к API
+     */
+    public function testConnection()
+    {
+        try {
+            $result = $this->makeRequest('/v3/business_data/business_listings/locations');
+            
+            return [
+                'success' => true,
+                'message' => 'API connection successful',
+                'available_locations' => count($result['data'] ?? [])
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'API connection failed: ' . $e->getMessage()
+            ];
+        }
+    }
+
 }
