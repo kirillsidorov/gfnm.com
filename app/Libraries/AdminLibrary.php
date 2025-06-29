@@ -152,7 +152,7 @@ class AdminLibrary
         return $query->countAllResults();
     }
     /**
-     * Применение фильтров к запросу - НОВЫЙ МЕТОД
+     * Применение фильтров к запросу - ОБНОВЛЕННАЯ ВЕРСИЯ с 3 состояниями
      */
     private function applyRestaurantFilters($query, $filters)
     {
@@ -180,40 +180,42 @@ class AdminLibrary
             }
         }
 
-        // НОВЫЙ: Фильтр по типу ресторана (грузинский или нет)
+        // ОБНОВЛЕННЫЙ: Фильтр по типу ресторана с 3 состояниями
         if (!empty($filters['restaurant_type'])) {
-            if ($filters['restaurant_type'] === 'georgian') {
-                // Ищем грузинские рестораны
-                $query->groupStart()
-                    ->like('restaurants.category', 'georgian', 'both')
-                    ->orLike('restaurants.category', 'грузин', 'both')
-                    ->orLike('restaurants.name', 'georgian', 'both')
-                    ->orLike('restaurants.name', 'georgia', 'both')
-                    ->orLike('restaurants.name', 'tbilisi', 'both')
-                    ->orLike('restaurants.name', 'khachapuri', 'both')
-                    ->orLike('restaurants.name', 'khinkali', 'both')
-                    ->orLike('restaurants.name', 'грузин', 'both')
-                    ->orLike('restaurants.name', 'тбилиси', 'both')
-                    ->orLike('restaurants.description', 'georgian', 'both')
-                    ->orLike('restaurants.description', 'georgia', 'both')
-                    ->orLike('restaurants.description', 'грузин', 'both')
-                    ->groupEnd();
-            } elseif ($filters['restaurant_type'] === 'non_georgian') {
-                // Исключаем грузинские рестораны
-                $query->groupStart()
-                    ->notLike('restaurants.category', 'georgian', 'both')
-                    ->notLike('restaurants.category', 'грузин', 'both')
-                    ->notLike('restaurants.name', 'georgian', 'both')
-                    ->notLike('restaurants.name', 'georgia', 'both')
-                    ->notLike('restaurants.name', 'tbilisi', 'both')
-                    ->notLike('restaurants.name', 'khachapuri', 'both')
-                    ->notLike('restaurants.name', 'khinkali', 'both')
-                    ->notLike('restaurants.name', 'грузин', 'both')
-                    ->notLike('restaurants.name', 'тбилиси', 'both')
-                    ->notLike('restaurants.description', 'georgian', 'both')
-                    ->notLike('restaurants.description', 'georgia', 'both')
-                    ->notLike('restaurants.description', 'грузин', 'both')
-                    ->groupEnd();
+            switch ($filters['restaurant_type']) {
+                case 'georgian':
+                    // Точно грузинские (is_georgian = 1)
+                    $query->where('restaurants.is_georgian', 1);
+                    break;
+                    
+                case 'non_georgian':
+                    // Точно не грузинские (is_georgian = 0)
+                    $query->where('restaurants.is_georgian', 0);
+                    break;
+                    
+                case 'undetermined':
+                    // Не определено (is_georgian = NULL)
+                    $query->where('restaurants.is_georgian IS NULL');
+                    break;
+                    
+                case 'auto_detected':
+                    // Не определено вручную, но автоматически определяется как грузинский
+                    $query->where('restaurants.is_georgian IS NULL')
+                        ->groupStart()
+                        ->like('restaurants.category', 'georgian', 'both')
+                        ->orLike('restaurants.category', 'грузин', 'both')
+                        ->orLike('restaurants.name', 'georgian', 'both')
+                        ->orLike('restaurants.name', 'georgia', 'both')
+                        ->orLike('restaurants.name', 'tbilisi', 'both')
+                        ->orLike('restaurants.name', 'khachapuri', 'both')
+                        ->orLike('restaurants.name', 'khinkali', 'both')
+                        ->orLike('restaurants.name', 'грузин', 'both')
+                        ->orLike('restaurants.name', 'тбилиси', 'both')
+                        ->orLike('restaurants.description', 'georgian', 'both')
+                        ->orLike('restaurants.description', 'georgia', 'both')
+                        ->orLike('restaurants.description', 'грузин', 'both')
+                        ->groupEnd();
+                    break;
             }
         }
 
@@ -250,6 +252,105 @@ class AdminLibrary
         }
     }
 
+    /**
+     * Определение типа ресторана - ОБНОВЛЕННАЯ ВЕРСИЯ
+     */
+    public function getRestaurantType($restaurant)
+    {
+        $isGeorgian = $restaurant['is_georgian'];
+        
+        if ($isGeorgian === '1' || $isGeorgian === 1) {
+            return [
+                'type' => 'georgian',
+                'label' => 'Грузинский',
+                'badge_class' => 'success',
+                'icon' => 'flag',
+                'confirmed' => true
+            ];
+        } elseif ($isGeorgian === '0' || $isGeorgian === 0) {
+            return [
+                'type' => 'non_georgian',
+                'label' => 'Обычный',
+                'badge_class' => 'secondary',
+                'icon' => 'times',
+                'confirmed' => true
+            ];
+        } else {
+            // Автоматическое определение для null значений
+            $autoDetected = $this->isGeorgianRestaurantAuto($restaurant);
+            
+            if ($autoDetected['detected']) {
+                return [
+                    'type' => 'auto_detected',
+                    'label' => 'Возможно грузинский',
+                    'badge_class' => 'warning text-dark',
+                    'icon' => 'question',
+                    'confirmed' => false,
+                    'indicators' => $autoDetected['indicators']
+                ];
+            } else {
+                return [
+                    'type' => 'undetermined',
+                    'label' => 'Не определен',
+                    'badge_class' => 'light text-dark',
+                    'icon' => 'question-circle',
+                    'confirmed' => false
+                ];
+            }
+        }
+    }
+
+    /**
+     * Автоматическое определение грузинского ресторана - НОВЫЙ МЕТОД
+     */
+    private function isGeorgianRestaurantAuto($restaurant)
+    {
+        $georgianKeywords = [
+            'georgian', 'georgia', 'tbilisi', 'khachapuri', 'khinkali', 
+            'adjarian', 'supra', 'caucas', 'грузин', 'тбилиси', 'хачапури', 'хинкали'
+        ];
+        
+        $indicators = [];
+        $detected = false;
+        
+        // Проверяем категорию
+        $category = strtolower($restaurant['category'] ?? '');
+        foreach ($georgianKeywords as $keyword) {
+            if (strpos($category, $keyword) !== false) {
+                $detected = true;
+                $indicators[] = 'категория';
+                break;
+            }
+        }
+        
+        // Проверяем название
+        $name = strtolower($restaurant['name'] ?? '');
+        foreach ($georgianKeywords as $keyword) {
+            if (strpos($name, $keyword) !== false) {
+                $detected = true;
+                $indicators[] = 'название';
+                break;
+            }
+        }
+        
+        // Проверяем описание
+        $description = strtolower($restaurant['description'] ?? '');
+        foreach ($georgianKeywords as $keyword) {
+            if (strpos($description, $keyword) !== false) {
+                $detected = true;
+                if (!in_array('описание', $indicators)) {
+                    $indicators[] = 'описание';
+                }
+                break;
+            }
+        }
+        
+        return [
+            'detected' => $detected,
+            'indicators' => $indicators
+        ];
+    }
+    
     /**
      * Вспомогательная функция для определения типа ресторана - НОВЫЙ МЕТОД
      */
@@ -497,7 +598,7 @@ class AdminLibrary
         
         return null;
     }
-    
+
     /**
      * Экспорт ресторанов в CSV
      */

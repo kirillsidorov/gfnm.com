@@ -209,19 +209,6 @@ echo "<!-- DEBUG: MainPhoto isset: " . (isset($mainPhoto) ? 'YES' : 'NO') . " --
                                 <i class="far fa-heart" id="favorite-icon"></i> Save
                             </button>
                         </div>
-
-                        <!-- Today's Hours -->
-                        <?php if (isset($restaurant['hours_info']['today'])): ?>
-                            <div class="card hours-today mb-3">
-                                <div class="card-body py-2">
-                                    <small class="text-muted">Today's Hours:</small>
-                                    <span class="fw-bold ms-2"><?= $restaurant['hours_info']['today']['hours'] ?></span>
-                                    <?php if (isset($restaurant['status_info']['next_change'])): ?>
-                                        <small class="text-muted ms-2"><?= $restaurant['status_info']['next_change'] ?></small>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -314,60 +301,6 @@ echo "<!-- DEBUG: MainPhoto isset: " . (isset($mainPhoto) ? 'YES' : 'NO') . " --
                                 <i class="fas fa-check"></i> <?= $accessibilityLabels[$option] ?? ucwords(str_replace('_', ' ', $option)) ?>
                             </span>
                         <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endif; ?>
-
-                <!-- Hours of Operation -->
-                <?php if (!empty($restaurant['hours_info']['formatted'])): ?>
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h3 class="card-title mb-0">
-                            <i class="fas fa-clock text-georgian"></i> Hours of Operation
-                        </h3>
-                    </div>
-                    <div class="card-body">
-                        <?php foreach ($restaurant['hours_info']['formatted'] as $dayInfo): ?>
-                            <div class="d-flex justify-content-between align-items-center py-2 <?= $dayInfo['is_today'] ? 'bg-light rounded px-3' : '' ?>">
-                                <span class="fw-bold <?= $dayInfo['is_today'] ? 'text-primary' : '' ?>">
-                                    <?= $dayInfo['day'] ?><?= $dayInfo['is_today'] ? ' (Today)' : '' ?>
-                                </span>
-                                <span class="<?= $dayInfo['is_today'] ? 'fw-bold' : '' ?>">
-                                    <?= $dayInfo['hours'] ?>
-                                </span>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endif; ?>
-
-                <!-- Popular Times -->
-                <?php if (!empty($restaurant['popular_times']) && is_array($restaurant['popular_times'])): ?>
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h3 class="card-title mb-0">
-                            <i class="fas fa-chart-bar text-georgian"></i> Popular Times
-                        </h3>
-                        <small class="text-muted">Typical visit duration: 45-90 minutes</small>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <label for="day-selector" class="form-label">Select Day:</label>
-                                <select class="form-select" id="day-selector" onchange="updatePopularTimes()">
-                                    <option value="monday">Monday</option>
-                                    <option value="tuesday">Tuesday</option>
-                                    <option value="wednesday">Wednesday</option>
-                                    <option value="thursday">Thursday</option>
-                                    <option value="friday" selected>Friday</option>
-                                    <option value="saturday">Saturday</option>
-                                    <option value="sunday">Sunday</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="mt-3" id="popular-times-chart">
-                            <!-- Заполняется JavaScript -->
-                        </div>
                     </div>
                 </div>
                 <?php endif; ?>

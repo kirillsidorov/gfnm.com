@@ -149,4 +149,67 @@ class RestaurantPhotoModel extends Model
     {
         return $this->where('photo_reference', $photoReference)->countAllResults() > 0;
     }
+
+    /**
+     * БЫСТРОЕ получение главного фото БЕЗ лишних запросов
+     */
+    public function getMainPhotoFast($restaurantId)
+    {
+        static $cache = [];
+        
+        // Простое кеширование в памяти для одного запроса
+        if (isset($cache[$restaurantId])) {
+            return $cache[$restaurantId];
+        }
+        
+        // Один быстрый запрос с лимитом
+        $photo = $this->select('file_path, alt_text')
+                    ->where('restaurant_id', $restaurantId)
+                    ->where('is_active', 1)
+                    ->orderBy('is_main', 'DESC')
+                    ->orderBy('created_at', 'ASC')
+                    ->limit(1)
+                    ->first();
+        
+        $result = $photo ? [
+            'file_path' => $photo['file_path'],
+            'alt_text' => $photo['alt_text'] ?? ''
+        ] : null;
+        
+        // Кешируем в памяти
+        $cache[$restaurantId] = $result;
+        
+        return $result;
+    }
+
+    /**
+     * Получение фотографий для нескольких ресторанов одним запросом
+     */
+    public function getMainPhotosForRestaurants($restaurantIds)
+    {
+        if (empty($restaurantIds)) {
+            return [];
+        }
+        
+        // Один запрос для всех ресторанов
+        $photos = $this->select('restaurant_id, file_path, alt_text')
+                    ->whereIn('restaurant_id', $restaurantIds)
+                    ->where('is_active', 1)
+                    ->groupBy('restaurant_id')
+                    ->orderBy('is_main', 'DESC')
+                    ->orderBy('created_at', 'ASC')
+                    ->findAll();
+        
+        $result = [];
+        foreach ($photos as $photo) {
+            if (!isset($result[$photo['restaurant_id']])) {
+                $result[$photo['restaurant_id']] = [
+                    'file_path' => $photo['file_path'],
+                    'alt_text' => $photo['alt_text'] ?? ''
+                ];
+            }
+        }
+        
+        return $result;
+    }
 }
