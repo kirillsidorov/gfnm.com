@@ -25,8 +25,8 @@ $routes->get('search', 'Home::search');
 
 // ИСПРАВЛЕНО: Новая правильная логика маршрутов
 $routes->get('georgian-restaurant-near-me', 'MapController::nearMe');  
-$routes->get('restaurants', 'Restaurants::browse');                   
-$routes->get('georgian-restaurant', 'Restaurants::browse');          
+$routes->get('restaurants', 'Restaurants::browse');    
+$routes->get('georgian-restaurant', 'Restaurants::browse');
 
 // Карта (можно оставить отдельно или сделать редирект)
 $routes->get('map', 'MapController::index');
@@ -45,7 +45,11 @@ $routes->get('georgian-cuisine', function() {
 });
 
 // Географические редиректы
-$routes->get('georgian-restaurant-nyc', 'Restaurants::newYorkCity');
+$routes->get('georgian-restaurants-nyc', 'Restaurants::newYorkCity');
+
+$routes->get('georgian-restaurant-nyc', function() {
+    return redirect()->to(base_url('georgian-restaurants-nyc'));
+});
 
 // Near me редиректы (ОБНОВЛЕНЫ)
 $routes->get('khachapuri-near-me', function() {

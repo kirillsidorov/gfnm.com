@@ -48,6 +48,220 @@ class Restaurants extends BaseController
         return cache()->save($key, $data, $ttl);
     }
 
+    public function newYorkCity()
+    {
+        // Получаем параметры фильтрации
+        $request = $this->request;
+        $priceLevel = $request->getGet('price');
+        $sortBy = $request->getGet('sort') ?? 'rating';
+        $boroughFilter = $request->getGet('borough');
+
+        // Координаты центра NYC для поиска по радиусу
+        $nycCoordinates = [
+            'latitude' => 40.7128,
+            'longitude' => -74.0060
+        ];
+
+        // Создаем "виртуальный" город NYC
+        $nycCity = [
+            'id' => 'nyc',
+            'name' => 'New York City',
+            'state' => 'NY',
+            'slug' => 'nyc',
+            'latitude' => $nycCoordinates['latitude'],
+            'longitude' => $nycCoordinates['longitude']
+        ];
+
+        // Каскадный поиск ресторанов
+        $searchResult = $this->findRestaurantsCascadeNYC($nycCity, $priceLevel, $sortBy, $boroughFilter);
+
+        $data = [
+            'title' => 'Georgian Food in New York City - Georgian Food Near Me',
+            'meta_description' => 'Find the best Georgian restaurants in New York City. Manhattan, Brooklyn, Queens and other NYC locations with authentic Georgian cuisine.',
+            'city' => $nycCity,
+            'restaurants' => $searchResult['restaurants'],
+            'totalRestaurants' => count($searchResult['restaurants']),
+            'selectedPrice' => $priceLevel,
+            'selectedSort' => $sortBy,
+            'selectedBorough' => $boroughFilter,
+            'isNYC' => true,
+            'search_info' => $searchResult['search_info']
+        ];
+
+        return view('restaurants/by_city', $data);
+    }
+/**
+     * Каскадный поиск ресторанов для NYC
+     */
+    private function findRestaurantsCascadeNYC($nycCity, $priceLevel = null, $sortBy = 'rating', $boroughFilter = null)
+    {
+    // Шаг 1: Поиск в конкретных районах NYC (Brooklyn, Manhattan)
+    $builder = $this->restaurantModel->select('restaurants.*, cities.name as city_name')
+                                   ->join('cities', 'cities.id = restaurants.city_id')
+                                   ->whereIn('restaurants.city_id', [4, 7]) // Brooklyn и Manhattan
+                                   ->where('restaurants.is_active', 1);
+
+    if ($boroughFilter) {
+        $builder->where('restaurants.city_id', $boroughFilter);
+    }
+
+    if ($priceLevel) {
+        $builder->where('restaurants.price_level', $priceLevel);
+    }
+
+    $this->applySorting($builder, $sortBy);
+    $restaurants = $builder->findAll();
+
+    // Добавляем фотографии
+    foreach ($restaurants as &$restaurant) {
+        $restaurant['main_photo'] = $this->photoModel->getMainPhoto($restaurant['id']);
+    }
+    unset($restaurant);
+
+    if (!empty($restaurants)) {
+        return [
+            'restaurants' => $restaurants,
+            'search_info' => [
+                'method' => 'exact_boroughs',
+                'message' => 'Georgian restaurants in NYC boroughs',
+                'count' => count($restaurants)
+            ]
+        ];
+    }
+
+    // Шаг 2: Поиск в радиусе 30км от центра NYC
+    $restaurants = $this->searchByRadiusWithFilters($nycCity, 30, $priceLevel, $sortBy);
+
+    if (!empty($restaurants)) {
+        return [
+            'restaurants' => $restaurants,
+            'search_info' => [
+                'method' => 'radius_30',
+                'message' => 'Georgian restaurants within 30km of NYC',
+                'count' => count($restaurants)
+            ]
+        ];
+    }
+
+    // Шаг 3: Поиск по всему штату NY
+    $restaurants = $this->searchByStateWithFilters('NY', $priceLevel, $sortBy);
+
+    if (!empty($restaurants)) {
+        return [
+            'restaurants' => $restaurants,
+            'search_info' => [
+                'method' => 'state_ny',
+                'message' => 'Georgian restaurants in New York State',
+                'count' => count($restaurants)
+            ]
+        ];
+    }
+
+    // Шаг 4: Расширенный поиск в радиусе 100км
+    $restaurants = $this->searchByRadiusWithFilters($nycCity, 100, $priceLevel, $sortBy);
+
+    return [
+        'restaurants' => $restaurants,
+        'search_info' => [
+            'method' => 'radius_100',
+            'message' => !empty($restaurants) 
+                ? 'Georgian restaurants within 100km of NYC' 
+                : 'No Georgian restaurants found near NYC',
+            'count' => count($restaurants)
+        ]
+    ];
+}
+
+/**
+     * ИСПРАВЛЕННЫЙ поиск по радиусу с фильтрами
+     */
+    private function searchByRadiusWithFilters($city, $radiusKm, $priceLevel = null, $sortBy = 'rating')
+    {
+        $sql = "SELECT restaurants.*, cities.name as city_name,
+                (6371 * acos(cos(radians(?)) 
+                * cos(radians(restaurants.latitude)) 
+                * cos(radians(restaurants.longitude) - radians(?)) 
+                + sin(radians(?)) 
+                * sin(radians(restaurants.latitude)))) AS distance 
+                FROM restaurants 
+                LEFT JOIN cities ON cities.id = restaurants.city_id
+                WHERE restaurants.is_active = 1 
+                AND restaurants.latitude IS NOT NULL 
+                AND restaurants.longitude IS NOT NULL";
+
+        $params = [$city['latitude'], $city['longitude'], $city['latitude']];
+
+        if ($priceLevel) {
+            $sql .= " AND restaurants.price_level = ?";
+            $params[] = $priceLevel;
+        }
+
+        $sql .= " HAVING distance < ?";
+        $params[] = $radiusKm;
+
+        // Сортировка
+        switch ($sortBy) {
+            case 'name':
+                $sql .= " ORDER BY restaurants.name ASC";
+                break;
+            case 'rating':
+                $sql .= " ORDER BY restaurants.rating DESC";
+                break;
+            case 'price_low':
+                $sql .= " ORDER BY restaurants.price_level ASC";
+                break;
+            case 'price_high':
+                $sql .= " ORDER BY restaurants.price_level DESC";
+                break;
+            case 'distance':
+                $sql .= " ORDER BY distance ASC";
+                break;
+            default:
+                $sql .= " ORDER BY distance ASC";
+        }
+
+        $sql .= " LIMIT 50";
+
+        // ИСПРАВЛЕНО: используем $this->db() вместо $this->db
+        $db = \Config\Database::connect();
+        $results = $db->query($sql, $params)->getResultArray();
+
+        // Добавляем фотографии
+        foreach ($results as &$restaurant) {
+            $restaurant['main_photo'] = $this->photoModel->getMainPhoto($restaurant['id']);
+        }
+        unset($restaurant);
+
+        return $results;
+    }
+
+    /**
+     * ИСПРАВЛЕННЫЙ поиск по штату с фильтрами
+     */
+    private function searchByStateWithFilters($state, $priceLevel = null, $sortBy = 'rating')
+    {
+        $builder = $this->restaurantModel->select('restaurants.*, cities.name as city_name')
+                                    ->join('cities', 'cities.id = restaurants.city_id')
+                                    ->where('cities.state', $state)
+                                    ->where('restaurants.is_active', 1);
+
+        if ($priceLevel) {
+            $builder->where('restaurants.price_level', $priceLevel);
+        }
+
+        $this->applySorting($builder, $sortBy);
+        
+        $restaurants = $builder->limit(50)->findAll();
+
+        // Добавляем фотографии
+        foreach ($restaurants as &$restaurant) {
+            $restaurant['main_photo'] = $this->photoModel->getMainPhoto($restaurant['id']);
+        }
+        unset($restaurant);
+
+        return $restaurants;
+    }
+
     /**
      * ИСПРАВЛЕННЫЙ метод byCitySlugNew БЕЗ ЦЕНЫ
      */
