@@ -1957,87 +1957,6 @@ private function processCsvFile($file)
     }
 
     /**
-     * Управление sitemap
-     */
-    public function sitemap()
-    {
-        if (!session('admin_logged_in')) {
-            return redirect()->to('/admin/login');
-        }
-
-        $restaurantModel = model('RestaurantModel');
-        $cityModel = model('CityModel');
-        $sitemapPath = FCPATH . '../writable/uploads/sitemap.xml';
-
-        $stats = [
-            'restaurants_count' => $restaurantModel->where('is_active', 1)->countAllResults(),
-            'cities_count' => $cityModel->countAllResults(),
-            'sitemap_exists' => file_exists($sitemapPath),
-            'sitemap_size' => file_exists($sitemapPath) ? filesize($sitemapPath) : 0,
-            'sitemap_modified' => file_exists($sitemapPath) ? filemtime($sitemapPath) : null,
-            'robots_exists' => file_exists(FCPATH . 'robots.txt')
-        ];
-
-        $defaultSettings = [
-            'include_restaurants' => true,
-            'include_cities' => true,
-            'include_static_pages' => true,
-            'restaurants_priority' => '0.6',
-            'cities_priority' => '0.8',
-            'static_priority' => '0.5',
-            'restaurants_changefreq' => 'monthly',
-            'cities_changefreq' => 'weekly',
-            'static_changefreq' => 'monthly'
-        ];
-
-        $data = [
-            'title' => 'Sitemap Generator',
-            'stats' => $stats,
-            'settings' => $defaultSettings
-        ];
-
-        return view('admin/sitemap', $data);
-    }
-
-    public function generateSitemap()
-    {
-        if (!session('admin_logged_in')) {
-            return $this->response->setJSON(['success' => false, 'message' => 'Требуется авторизация']);
-        }
-
-        try {
-            $settings = $this->getSitemapSettings();
-            $sitemap = $this->buildSitemap($settings);
-            
-            // Сохраняем только в uploads
-            $uploadsPath = FCPATH . '../writable/uploads/sitemap.xml';
-            
-            // Создаем папку uploads если не существует
-            $uploadsDir = dirname($uploadsPath);
-            if (!is_dir($uploadsDir)) {
-                mkdir($uploadsDir, 0755, true);
-            }
-            
-            if (file_put_contents($uploadsPath, $sitemap)) {
-                $this->createRobotsTxt();
-                
-                return $this->response->setJSON([
-                    'success' => true,
-                    'message' => 'Sitemap успешно сгенерирован',
-                    'data' => [
-                        'file_size' => filesize($uploadsPath),
-                        'file_size_formatted' => $this->formatBytes(filesize($uploadsPath)),
-                        'url_count' => substr_count($sitemap, '<url>'),
-                        'file_path' => base_url('sitemap.xml') // стандартный URL
-                    ]
-                ]);
-            }
-        } catch (\Exception $e) {
-            return $this->response->setJSON(['success' => false, 'message' => 'Ошибка: ' . $e->getMessage()]);
-        }
-    }
-
-    /**
      * Получение настроек sitemap
      */
     private function getSitemapSettings()
@@ -2145,16 +2064,102 @@ private function processCsvFile($file)
         file_put_contents($robotsPath, $robotsContent);
     }
 
-    /**
-    * Валидация sitemap
-    */
-    public function validateSitemap()
-    {
+/**
+ * Управление sitemap
+ */
+public function sitemap()
+{
+    if (!session('admin_logged_in')) {
+        return redirect()->to('/admin/login');
+    }
+
+    $restaurantModel = model('RestaurantModel');
+    $cityModel = model('CityModel');
+    
+    // ИЗМЕНЕНО: используем публичную папку uploads
+    $sitemapPath = FCPATH . 'uploads/sitemap.xml';
+
+    $stats = [
+        'restaurants_count' => $restaurantModel->where('is_active', 1)->countAllResults(),
+        'cities_count' => $cityModel->countAllResults(),
+        'sitemap_exists' => file_exists($sitemapPath),
+        'sitemap_size' => file_exists($sitemapPath) ? filesize($sitemapPath) : 0,
+        'sitemap_modified' => file_exists($sitemapPath) ? filemtime($sitemapPath) : null,
+        'robots_exists' => file_exists(FCPATH . 'robots.txt')
+    ];
+
+    $defaultSettings = [
+        'include_restaurants' => true,
+        'include_cities' => true,
+        'include_static_pages' => true,
+        'restaurants_priority' => '0.6',
+        'cities_priority' => '0.8',
+        'static_priority' => '0.5',
+        'restaurants_changefreq' => 'monthly',
+        'cities_changefreq' => 'weekly',
+        'static_changefreq' => 'monthly'
+    ];
+
+    $data = [
+        'title' => 'Sitemap Generator',
+        'stats' => $stats,
+        'settings' => $defaultSettings
+    ];
+
+    return view('admin/sitemap', $data);
+}
+
+public function generateSitemap()
+{
     if (!session('admin_logged_in')) {
         return $this->response->setJSON(['success' => false, 'message' => 'Требуется авторизация']);
     }
 
-    $filePath = FCPATH . '../writable/uploads/sitemap.xml';
+    try {
+        $settings = $this->getSitemapSettings();
+        $sitemap = $this->buildSitemap($settings);
+        
+        // ИЗМЕНЕНО: сохраняем в публичную папку uploads
+        $uploadsPath = FCPATH . 'uploads/sitemap.xml';
+        
+        // Создаем папку uploads если не существует
+        $uploadsDir = dirname($uploadsPath);
+        if (!is_dir($uploadsDir)) {
+            mkdir($uploadsDir, 0755, true);
+        }
+        
+        if (file_put_contents($uploadsPath, $sitemap)) {
+            $this->createRobotsTxt();
+            
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => 'Sitemap успешно сгенерирован',
+                'data' => [
+                    'file_size' => filesize($uploadsPath),
+                    'file_size_formatted' => $this->formatBytes(filesize($uploadsPath)),
+                    'url_count' => substr_count($sitemap, '<url>'),
+                    'file_path' => base_url('sitemap.xml') // теперь доступен напрямую
+                ]
+            ]);
+        }
+    } catch (\Exception $e) {
+        return $this->response->setJSON(['success' => false, 'message' => 'Ошибка: ' . $e->getMessage()]);
+    }
+
+    return $this->response->setJSON(['success' => false, 'message' => 'Не удалось создать файл']);
+}
+
+/**
+ * Валидация sitemap
+ */
+public function validateSitemap()
+{
+    if (!session('admin_logged_in')) {
+        return $this->response->setJSON(['success' => false, 'message' => 'Требуется авторизация']);
+    }
+
+    // ИЗМЕНЕНО: используем публичную папку uploads
+    $filePath = FCPATH . 'uploads/sitemap.xml';
     
     if (!file_exists($filePath)) {
         return $this->response->setJSON(['success' => false, 'message' => 'Sitemap не найден']);
@@ -2189,18 +2194,19 @@ private function processCsvFile($file)
             'file_size_formatted' => $this->formatBytes($fileSize)
         ]
     ]);
-    }
+}
 
-    /**
-    * Удаление sitemap
-    */
-    public function deleteSitemap()
-    {
+/**
+ * Удаление sitemap
+ */
+public function deleteSitemap()
+{
     if (!session('admin_logged_in')) {
         return $this->response->setJSON(['success' => false, 'message' => 'Требуется авторизация']);
     }
 
-    $filePath = FCPATH . '../writable/uploads/sitemap.xml';
+    // ИЗМЕНЕНО: используем публичную папку uploads
+    $filePath = FCPATH . 'uploads/sitemap.xml';
     
     if (file_exists($filePath)) {
         if (unlink($filePath)) {
@@ -2211,37 +2217,25 @@ private function processCsvFile($file)
     } else {
         return $this->response->setJSON(['success' => false, 'message' => 'Файл не найден']);
     }
+}
+
+/**
+ * Обновление статистики дашборда
+ */
+public function dashboardStats()
+{
+    if (!session('admin_logged_in')) {
+        return $this->response->setJSON(['error' => 'Unauthorized']);
     }
 
-    /**
-    * Форматирование размера файла
-    */
-    private function formatBytes($size, $precision = 2)
-    {
-    $units = ['B', 'KB', 'MB', 'GB'];
+    $restaurantModel = model('RestaurantModel');
+    $cityModel = model('CityModel');
     
-    for ($i = 0; $size > 1024 && $i < count($units) - 1; $i++) {
-        $size /= 1024;
-    }
-    
-    return round($size, $precision) . ' ' . $units[$i];
-    }
+    // ИЗМЕНЕНО: используем публичную папку uploads
+    $sitemapPath = FCPATH . 'uploads/sitemap.xml';
+    $robottxtPath = FCPATH . 'robots.txt';
 
-    /**
-    * Обновление статистики дашборда для добавления данных геокодирования
-    */
-    public function dashboardStats()
-    {
-        if (!session('admin_logged_in')) {
-            return $this->response->setJSON(['error' => 'Unauthorized']);
-        }
-
-        $restaurantModel = model('RestaurantModel');
-        $cityModel = model('CityModel');
-        $sitemapPath = FCPATH . '../writable/uploads/sitemap.xml';
-        $robottxtPath = FCPATH . 'robots.txt';
-
-        $stats = [
+    $stats = [
         'total_restaurants' => $restaurantModel->countAllResults(),
         'active_restaurants' => $restaurantModel->where('is_active', 1)->countAllResults(),
         'total_cities' => $cityModel->countAllResults(),
@@ -2260,27 +2254,41 @@ private function processCsvFile($file)
         'sitemap_modified' => file_exists($sitemapPath) ? filemtime($sitemapPath) : null,
         'sitemap_size' => file_exists($sitemapPath) ? filesize($sitemapPath) : 0,
         'robots_exists' => file_exists($robottxtPath)
-        ];
+    ];
 
-        return $this->response->setJSON($stats);
-    }
+    return $this->response->setJSON($stats);
+}
+
+/**
+ * Публичный доступ к sitemap - БОЛЬШЕ НЕ НУЖЕН!
+ * Так как файл теперь в публичной папке и доступен напрямую
+ */
+public function publicSitemap()
+{
+    // Просто редирект на прямой доступ к файлу
+    return redirect()->to(base_url('uploads/sitemap.xml'));
+}
+
+
 
     /**
-     * Публичный доступ к sitemap
-     */
-    public function publicSitemap()
+    * Форматирование размера файла
+    */
+    private function formatBytes($size, $precision = 2)
     {
-        //$sitemapPath = WRITEPATH . 'uploads/sitemap.xml';
-        $sitemapPath = FCPATH . '../writable/uploads/sitemap.xml';
-        if (!file_exists($sitemapPath)) {
-            throw new \CodeIgniter\Exceptions\PageNotFoundException('Sitemap not found');
-        }
-        
-        // Устанавливаем правильные заголовки
-        return $this->response
-            ->setHeader('Content-Type', 'application/xml; charset=utf-8')
-            ->setBody(file_get_contents($sitemapPath));
+    $units = ['B', 'KB', 'MB', 'GB'];
+    
+    for ($i = 0; $size > 1024 && $i < count($units) - 1; $i++) {
+        $size /= 1024;
     }
+    
+    return round($size, $precision) . ' ' . $units[$i];
+    }
+
+    
+
+   
+
     /**
      * AJAX геокодирование адреса
      */

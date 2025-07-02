@@ -1,9 +1,10 @@
 RewriteEngine On
 
+# Специальный редирект для sitemap.xml
+RewriteRule ^sitemap\.xml$ uploads/sitemap.xml [L]
 
+# Существующие правила uploads
 RewriteRule ^uploads/(.+)$ public/uploads/$1 [L]
-
-# Обработка uploads для shared hosting
 RewriteRule ^uploads/(.*)$ ./public/uploads/$1 [L]
 
 # Если кто-то пытается зайти напрямую в /public/ - редирект

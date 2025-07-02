@@ -220,7 +220,9 @@ $routes->post('/api/map/search', 'MapController::searchLocal');
 $routes->post('/api/map/nearby', 'MapController::searchNearby');
 
 // ===== SITEMAP И SEO =====
-$routes->get('sitemap.xml', 'Admin::publicSitemap');
+$routes->get('sitemap.xml', function() {
+    return redirect()->to(base_url('uploads/sitemap.xml'));
+});
 
 // Простой API тест
 $routes->get('simple-api-test', 'SimpleApiTestController::index');
