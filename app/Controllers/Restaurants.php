@@ -449,4 +449,121 @@ class Restaurants extends BaseController
             'environment' => ENVIRONMENT
         ]);
     }
+
+    // ВОССТАНОВЛЕННЫЙ МЕТОД BROWSE
+    public function browse()
+    {
+        // Получаем параметры фильтрации
+        $request = $this->request;
+        $cityId = $request->getGet('city');
+        $priceLevel = $request->getGet('price');
+        $sortBy = $request->getGet('sort') ?? 'rating';
+        $page = $request->getGet('page') ?? 1;
+        $perPage = 12;
+
+        // Получаем рестораны с фильтрацией
+        $builder = $this->restaurantModel->select('restaurants.*, cities.name as city_name, cities.slug as city_slug')
+                                    ->join('cities', 'cities.id = restaurants.city_id')
+                                    ->where('restaurants.is_active', 1);
+
+        if ($cityId) {
+            $builder->where('restaurants.city_id', $cityId);
+        }
+
+        if ($priceLevel) {
+            $builder->where('restaurants.price_level', $priceLevel);
+        }
+
+        // Сортировка
+        switch ($sortBy) {
+            case 'name':
+                $builder->orderBy('restaurants.name', 'ASC');
+                break;
+            case 'rating':
+                $builder->orderBy('restaurants.rating', 'DESC');
+                break;
+            case 'price_low':
+                $builder->orderBy('restaurants.price_level', 'ASC');
+                break;
+            case 'price_high':
+                $builder->orderBy('restaurants.price_level', 'DESC');
+                break;
+            default:
+                $builder->orderBy('restaurants.rating', 'DESC');
+        }
+
+        // Пагинация
+        $restaurants = $builder->paginate($perPage, 'default', $page);
+        $pager = $this->restaurantModel->pager;
+
+        // ДОБАВЛЕНО: Получаем фотографии для каждого ресторана
+        foreach ($restaurants as &$restaurant) {
+            $restaurant['main_photo'] = $this->photoModel->getMainPhoto($restaurant['id']);
+        }
+        unset($restaurant);
+
+        // Получаем города для фильтра
+        $cities = $this->cityModel->getActiveCitiesWithRestaurants();
+        
+        // Выбранный город для фильтра
+        $selectedCity = $cityId ? $this->cityModel->find($cityId) : null;
+
+        // Статистика
+        $totalRestaurants = $this->restaurantModel->where('is_active', 1)->countAllResults();
+        $totalCities = $this->cityModel->countAllResults();
+
+        // Получаем города сгруппированные по странам для дополнительной навигации
+        $citiesQuery = $this->cityModel
+            ->select('cities.id, cities.name, cities.state, cities.country, cities.slug, COUNT(restaurants.id) as restaurant_count')
+            ->join('restaurants', 'restaurants.city_id = cities.id AND restaurants.is_active = 1', 'left')
+            ->groupBy('cities.id, cities.name, cities.state, cities.country, cities.slug')
+            ->having('restaurant_count >', 0)
+            ->orderBy('cities.country, cities.state, cities.name')
+            ->findAll();
+        
+        // Группируем по странам
+        $countriesData = [];
+        foreach ($citiesQuery as $city) {
+            $country = $city['country'];
+            
+            if (!isset($countriesData[$country])) {
+                $countriesData[$country] = [
+                    'name' => $country,
+                    'cities' => [],
+                    'total_restaurants' => 0,
+                    'total_cities' => 0
+                ];
+            }
+            
+            $countriesData[$country]['cities'][] = $city;
+            $countriesData[$country]['total_restaurants'] += $city['restaurant_count'];
+            $countriesData[$country]['total_cities']++;
+        }
+
+        // Сортируем страны по количеству ресторанов
+        uasort($countriesData, function($a, $b) {
+            return $b['total_restaurants'] <=> $a['total_restaurants'];
+        });
+
+        $data = [
+            'title' => 'Browse All Georgian Restaurants - Georgian Food Directory',
+            'meta_description' => 'Browse our complete directory of Georgian restaurants. Filter by city, price, and rating. Find authentic khachapuri, khinkali and traditional Georgian cuisine.',
+            'canonical_url' => base_url('restaurants'),
+            'restaurants' => $restaurants,
+            'cities' => $cities,
+            'countriesData' => $countriesData,
+            'selectedCity' => $selectedCity,
+            'selectedPrice' => $priceLevel,
+            'selectedSort' => $sortBy,
+            'pager' => $pager,
+            'currentPage' => $page,
+            'totalRestaurants' => $totalRestaurants,
+            'totalCities' => $totalCities,
+            'totalCountries' => count($countriesData),
+            'showFilters' => true,
+            'isBrowsePage' => true
+        ];
+
+        return view('restaurants/browse', $data);
+    }
 }
