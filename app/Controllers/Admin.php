@@ -2021,7 +2021,7 @@ private function processCsvFile($file)
 
         // Статические страницы
         if ($settings['include_static_pages']) {
-            $staticPages = ['about', 'contact', 'map', 'privacy-policy', 'terms-of-service'];
+            $staticPages = ['about', 'map', 'privacy', 'terms'];
             foreach ($staticPages as $page) {
                 $xml .= $this->addSitemapUrl($baseUrl . $page, $settings['static_priority'], $settings['static_changefreq'], date('Y-m-d'));
             }

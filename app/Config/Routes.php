@@ -13,6 +13,17 @@ $routes->get('about', 'Pages::index');
 $routes->get('privacy', 'Pages::privacy');
 $routes->get('terms', 'Pages::terms');
 
+//Pages redirect
+$routes->get('privacy-policy', function() {
+    return redirect()->to(base_url('privacy'));
+});
+$routes->get('terms-of-service', function() {
+    return redirect()->to(base_url('terms'));
+});
+$routes->get('contact', function(){
+    return redirect()->to(base_url('about'));
+});
+
 // Bug Report routes
 $routes->get('bug-report', 'BugReport::index');
 $routes->post('bug-report/submit', 'BugReport::submit');
@@ -232,6 +243,8 @@ $routes->get('sitemap.xml', function() {
 $routes->get('simple-api-test', 'SimpleApiTestController::index');
 $routes->get('simple-api-test/(:alpha)', 'SimpleApiTestController::index/$1');
 $routes->get('simple-api-test/download/(:any)', 'SimpleApiTestController::download/$1');
+
+
 
 // ВАЖНО: Универсальный обработчик остается в конце
 $routes->get('(:segment)', 'Restaurants::bySeoUrl/$1');
