@@ -367,12 +367,7 @@
             "addressRegion": "<?= esc($state) ?>",
             "addressCountry": "US"
           },
-          "aggregateRating": {
-            "@type": "AggregateRating",
-            "ratingValue": "<?= number_format($restaurant['rating'], 1) ?>",
-            "bestRating": "5"
-          },
-          "priceRange": "<?php 
+        "priceRange": "<?php 
             $priceLevel = intval($restaurant['price_level']);
             for ($i = 0; $i < $priceLevel; $i++) echo '$';
           ?>",

@@ -244,15 +244,8 @@
             ,"addressRegion": "<?= esc($city['state']) ?>"
             <?php endif; ?>
             ,"addressCountry": "US"
-          }
-          <?php if (!empty($restaurant['rating']) && $restaurant['rating'] > 0): ?>
-          ,"aggregateRating": {
-            "@type": "AggregateRating",
-            "ratingValue": "<?= number_format($restaurant['rating'], 1) ?>",
-            "bestRating": "5"
-          }
-          <?php endif; ?>
-          ,"servesCuisine": "Georgian"
+          },
+          "servesCuisine": "Georgian"
           <?php if (!empty($restaurant['phone'])): ?>
           ,"telephone": "<?= esc($restaurant['phone']) ?>"
           <?php endif; ?>

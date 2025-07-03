@@ -52,7 +52,7 @@ class RestaurantsEnhance extends BaseController
         // Получаем статистику популярности
         $popularityStats = $this->calculatePopularityStats($restaurant);
 
-        // Генерируем структурированные данные для SEO
+        // Генерируем структурированные данные для SEO (БЕЗ РЕЙТИНГА)
         $structuredData = $this->generateStructuredData($restaurant, $photos);
 
         $data = [
@@ -73,7 +73,6 @@ class RestaurantsEnhance extends BaseController
         return view('restaurants/enhanced_view', $data);
     }
 
-
     /**
      * УЛУЧШЕННАЯ детальная страница ресторана с полным функционалом
      */
@@ -86,10 +85,7 @@ class RestaurantsEnhance extends BaseController
         }
         
         if (!$restaurant['is_active']) {
-            // Логируем попытку доступа к неактивному ресторану
             log_message('info', "Redirect to home: inactive restaurant '{$restaurant['name']}' (ID: {$restaurant['id']})");
-            
-            // Простой редирект на главную страницу
             return redirect()->to(base_url());
         }
 
@@ -107,7 +103,7 @@ class RestaurantsEnhance extends BaseController
         // Получаем статистику популярности
         $popularityStats = $this->calculatePopularityStats($restaurant);
 
-        // Генерируем структурированные данные для SEO
+        // Генерируем структурированные данные для SEO (БЕЗ РЕЙТИНГА)
         $structuredData = $this->generateStructuredData($restaurant, $photos);
 
         $data = [
@@ -122,14 +118,14 @@ class RestaurantsEnhance extends BaseController
             'structuredData' => $structuredData,
             'breadcrumbs' => $this->generateBreadcrumbs($restaurant),
             'og_image' => $mainPhoto ? base_url($mainPhoto['file_path']) : null,
-            'canonical_url' => base_url($restaurant['seo_url'] ?: 'restaurant/' . $id)
+            'canonical_url' => base_url($restaurant['seo_url'] ?: 'restaurant/' . $restaurant['id'])
         ];
 
         return view('restaurants/enhanced_view', $data);
     }
 
-/**
-     * Обработка данных ресторана - декодирование JSON полей (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+    /**
+     * Обработка данных ресторана - декодирование JSON полей
      */
     private function processRestaurantData($restaurant)
     {
@@ -147,7 +143,6 @@ class RestaurantsEnhance extends BaseController
                 if (json_last_error() === JSON_ERROR_NONE) {
                     $restaurant[$field] = $decoded;
                 } else {
-                    // Если JSON невалидный, оставляем как есть или делаем пустым массивом
                     if (in_array($field, ['people_also_search', 'place_topics', 'service_options'])) {
                         $restaurant[$field] = [];
                     }
@@ -310,7 +305,6 @@ class RestaurantsEnhance extends BaseController
     {
         if (empty($time)) return '';
         
-        // Конвертируем 24-часовой формат в 12-часовой
         $timestamp = strtotime($time);
         return $timestamp ? date('g:i A', $timestamp) : $time;
     }
@@ -337,7 +331,6 @@ class RestaurantsEnhance extends BaseController
 
         if ($totalDays === 0) return [];
 
-        // Вычисляем среднее
         foreach ($hours as $hour => $total) {
             $hours[$hour] = round($total / $totalDays);
         }
@@ -360,7 +353,6 @@ class RestaurantsEnhance extends BaseController
             ->limit(4)
             ->findAll();
 
-        // Добавляем фото и обрабатываем данные для каждого похожего ресторана
         foreach ($similarRestaurants as &$similar) {
             $similar['main_photo'] = $this->photoModel->getMainPhoto($similar['id']);
             $similar = $this->processRestaurantData($similar);
@@ -388,7 +380,6 @@ class RestaurantsEnhance extends BaseController
         $dayTotals = [];
         $hourTotals = [];
 
-        // Анализируем популярные времена
         foreach ($popularTimes as $day => $hours) {
             if (!is_array($hours)) continue;
 
@@ -401,30 +392,27 @@ class RestaurantsEnhance extends BaseController
             }
         }
 
-        // Находим самый загруженный и самый тихий день
         if (!empty($dayTotals)) {
             $stats['busiest_day'] = array_keys($dayTotals, max($dayTotals))[0];
             $stats['quietest_day'] = array_keys($dayTotals, min($dayTotals))[0];
         }
 
-        // Находим пиковые часы
         if (!empty($hourTotals)) {
             arsort($hourTotals);
             $stats['peak_hours'] = array_slice(array_keys($hourTotals), 0, 3);
         }
 
-        // Вычисляем общий балл популярности
-        $totalRating = $restaurant['rating'] ?? 0;
+        // Упрощенный балл популярности (без рейтинга в JSON-LD)
         $totalReviews = $restaurant['rating_count'] ?? 0;
         $avgPopularity = !empty($dayTotals) ? array_sum($dayTotals) / count($dayTotals) : 0;
-
-        $stats['popularity_score'] = ($totalRating * 10) + ($totalReviews * 0.1) + ($avgPopularity * 0.5);
+        
+        $stats['popularity_score'] = ($totalReviews * 0.1) + ($avgPopularity * 0.5);
 
         return $stats;
     }
 
     /**
-     * Генерация структурированных данных для SEO
+     * ✅ ИСПРАВЛЕННАЯ генерация structured data БЕЗ РЕЙТИНГА
      */
     private function generateStructuredData($restaurant, $photos = [])
     {
@@ -434,9 +422,7 @@ class RestaurantsEnhance extends BaseController
             'name' => $restaurant['name'],
             'description' => $restaurant['description'],
             'url' => base_url($restaurant['seo_url'] ?: 'restaurant/' . $restaurant['id']),
-            'telephone' => $restaurant['phone'],
             'servesCuisine' => 'Georgian',
-            'priceRange' => str_repeat('$', intval($restaurant['price_level'] ?? 1)),
             'address' => [
                 '@type' => 'PostalAddress',
                 'streetAddress' => $restaurant['address'],
@@ -455,29 +441,23 @@ class RestaurantsEnhance extends BaseController
                 'longitude' => $restaurant['longitude']
             ];
         }
+        
+        // Добавляем цену только если есть
+        if (!empty($restaurant['price_level']) && $restaurant['price_level'] > 0) {
+            $structuredData['priceRange'] = str_repeat('$', intval($restaurant['price_level']));
+        }
 
-        // Добавляем рейтинг если есть
-        if (!empty($restaurant['rating']) && !empty($restaurant['rating_count'])) {
-            $structuredData['aggregateRating'] = [
-                '@type' => 'AggregateRating',
-                'ratingValue' => $restaurant['rating'],
-                'reviewCount' => $restaurant['rating_count'],
-                'bestRating' => '5',
-                'worstRating' => '1'
-            ];
+        // Добавляем телефон только если есть
+        if (!empty($restaurant['phone'])) {
+            $structuredData['telephone'] = $restaurant['phone'];
         }
 
         // Добавляем рабочие часы
         if (!empty($restaurant['work_hours'])) {
             $openingHours = [];
             $days = [
-                'monday' => 'Mo',
-                'tuesday' => 'Tu', 
-                'wednesday' => 'We',
-                'thursday' => 'Th',
-                'friday' => 'Fr',
-                'saturday' => 'Sa',
-                'sunday' => 'Su'
+                'monday' => 'Mo', 'tuesday' => 'Tu', 'wednesday' => 'We',
+                'thursday' => 'Th', 'friday' => 'Fr', 'saturday' => 'Sa', 'sunday' => 'Su'
             ];
 
             foreach ($restaurant['work_hours'] as $day => $hours) {
@@ -500,7 +480,9 @@ class RestaurantsEnhance extends BaseController
             foreach ($photos as $photo) {
                 $images[] = base_url($photo['file_path']);
             }
-            $structuredData['image'] = $images;
+            if (!empty($images)) {
+                $structuredData['image'] = $images;
+            }
         }
 
         // Добавляем веб-сайт
@@ -533,24 +515,21 @@ class RestaurantsEnhance extends BaseController
     }
 
     /**
-     * Генерация мета-описания
+     * Генерация мета-описания (БЕЗ упоминания рейтинга из DataForSEO)
      */
     private function generateMetaDescription($restaurant)
     {
         $description = $restaurant['description'] ?? '';
         $city = $restaurant['city_name'] ?? '';
-        $rating = $restaurant['rating'] ?? 0;
 
         if (strlen($description) > 100) {
             $description = character_limiter(strip_tags($description), 120);
         }
 
         $metaDescription = $description;
-        if ($rating > 0) {
-            $metaDescription .= " Rated {$rating}/5.0.";
-        }
+        
         if ($city) {
-            $metaDescription .= " Authentic Georgian restaurant in {$city}.";
+            $metaDescription .= " Authentic Georgian restaurant in {$city}. Discover khachapuri, khinkali and traditional Georgian cuisine.";
         }
 
         return character_limiter($metaDescription, 155);
