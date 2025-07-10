@@ -869,7 +869,7 @@ private function processCsvFile($file)
         }
         
         // Проверяем наличие обязательных колонок
-        $requiredColumns = ['Name', 'Address', 'Rating', 'Place ID'];
+        $requiredColumns = ['Name', 'Address', 'Rating', 'Place ID', 'Latitude', 'Longitude'];
         $headerMap = [];
         
         foreach ($requiredColumns as $required) {
@@ -890,7 +890,9 @@ private function processCsvFile($file)
                     'name' => trim($data[$headerMap['Name']] ?? ''),
                     'address' => trim($data[$headerMap['Address']] ?? ''),
                     'rating' => (float)($data[$headerMap['Rating']] ?? 0),
-                    'google_place_id' => trim($data[$headerMap['Place ID']] ?? '')
+                    'google_place_id' => trim($data[$headerMap['Place ID']] ?? ''),
+                    'latitude' => (float)($data[$headerMap['Latitude']] ?? 0),
+                    'longitude' => (float)($data[$headerMap['Longitude']] ?? 0)
                 ];
                 
                 // Пропускаем строки с пустыми обязательными полями
@@ -908,7 +910,9 @@ private function processCsvFile($file)
                     $updateData = [
                         'name' => $restaurantData['name'],
                         'address' => $restaurantData['address'],
-                        'rating' => $restaurantData['rating']
+                        'rating' => $restaurantData['rating'],
+                        'latitude' => $restaurantData['latitude'],
+                        'longitude' => $restaurantData['longitude']
                     ];
                     
                     if ($restaurantModel->update($existingRestaurant['id'], $updateData)) {
@@ -982,7 +986,9 @@ private function processCsvFile($file)
             'city_id' => $cityId, // ОБЯЗАТЕЛЬНО должен быть заполнен
             'price_level' => 2, // Средний уровень цен по умолчанию
             'description' => $description,
-            'is_active' => 1
+            'is_active' => 1,
+            'latitude' => $csvData['latitude'],
+            'longitude' => $csvData['longitude']
         ];
         
         // Финальная проверка
