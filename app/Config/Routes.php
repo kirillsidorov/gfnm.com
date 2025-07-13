@@ -110,6 +110,18 @@ $routes->group('admin', ['filter' => 'adminauth'], function($routes) {
     
     // ===== УПРАВЛЕНИЕ РЕСТОРАНАМИ - РАСШИРЕННАЯ ВЕРСИЯ =====
     $routes->get('restaurants', 'Admin::restaurants');
+    // ===== УПРАВЛЕНИЕ ФИЛЬТРАМИ РЕСТОРАНОВ =====
+    $routes->get('filters/status', 'Admin::filtersStatus');
+    $routes->post('filters/save', 'Admin::saveFilters');
+    $routes->post('filters/clear', 'Admin::clearFilters');
+    $routes->get('filters/load', 'Admin::loadSavedFilters');
+    $routes->get('filters/stats', 'Admin::filtersStats');
+    $routes->get('filters/export', 'Admin::exportFilters');
+    $routes->post('filters/import', 'Admin::importFilters');
+    
+    // Дополнительные методы для типов ресторанов
+    $routes->post('restaurants/set-type/(:num)', 'Admin::setRestaurantType/$1');
+    $routes->post('restaurants/auto-detect-types', 'Admin::autoDetectTypes');
     $routes->match(['get', 'post'], 'restaurants/edit/(:num)', 'Admin::editRestaurant/$1');
     $routes->get('restaurants/delete/(:num)', 'Admin::deleteRestaurant/$1');
     $routes->post('restaurants/bulk', 'Admin::bulk');

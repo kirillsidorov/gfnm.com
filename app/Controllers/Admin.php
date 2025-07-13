@@ -155,7 +155,7 @@ class Admin extends BaseController
 
 
     /**
-     * ИСПРАВЛЕННЫЙ метод управления ресторанами с правильной пагинацией
+     * ИСПРАВЛЕННЫЙ метод управления ресторанами с передачей данных о фильтрах
      */
     public function restaurants()
     {
@@ -233,7 +233,10 @@ class Admin extends BaseController
             'stats' => $stats,
             'show_all' => $show_all,
             'total_restaurants' => $totalRestaurants,
-            'pager' => $pager // Теперь это правильный объект пагинатора
+            'pager' => $pager,
+            // ДОБАВЛЯЕМ информацию о сохраненных фильтрах
+            'saved_filters_exist' => !empty($savedFilters),
+            'saved_filters' => $savedFilters
         ];
 
         return view('admin/restaurants', $data);
@@ -413,15 +416,6 @@ class Admin extends BaseController
             log_message('error', 'Bulk operation error: ' . $e->getMessage());
             return $this->response->setJSON(['success' => false, 'message' => 'Ошибка выполнения операции']);
         }
-    }
-
-    /**
-     * Очистка фильтров сессии
-     */
-    public function clearFilters()
-    {
-        $this->adminLib->clearFilters();
-        return redirect()->to('admin/restaurants')->with('success', 'Фильтры очищены');
     }
 
 
@@ -3185,5 +3179,235 @@ public function publicSitemap()
         }
         
         return $info;
+    }
+
+
+    /**
+     * AJAX: Проверка статуса сохраненных фильтров
+     */
+    public function filtersStatus()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'Invalid request']);
+        }
+
+        $savedFilters = $this->adminLib->getSavedFilters();
+        $hasActiveFilters = !empty(array_filter($savedFilters));
+
+        return $this->response->setJSON([
+            'success' => true,
+            'has_saved_filters' => $hasActiveFilters,
+            'saved_filters' => $savedFilters,
+            'filter_count' => count(array_filter($savedFilters))
+        ]);
+    }
+
+    /**
+     * AJAX: Сохранение фильтров в сессию
+     */
+    public function saveFilters()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'Invalid request']);
+        }
+
+        $filters = $this->request->getPost('filters');
+        
+        if (!is_array($filters)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Неверный формат фильтров'
+            ]);
+        }
+
+        // Очищаем пустые значения
+        $cleanFilters = array_filter($filters, function($value) {
+            return !empty($value) && $value !== '';
+        });
+
+        try {
+            $this->adminLib->saveFilters($cleanFilters);
+            
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => 'Фильтры сохранены',
+                'saved_filters' => $cleanFilters,
+                'filter_count' => count($cleanFilters)
+            ]);
+            
+        } catch (\Exception $e) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Ошибка сохранения: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * AJAX: Очистка сохраненных фильтров
+     */
+    public function clearFilters()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'Invalid request']);
+        }
+
+        try {
+            $this->adminLib->clearFilters();
+            
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => 'Фильтры очищены'
+            ]);
+            
+        } catch (\Exception $e) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Ошибка очистки: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * AJAX: Загрузка сохраненных фильтров
+     */
+    public function loadSavedFilters()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'Invalid request']);
+        }
+
+        $savedFilters = $this->adminLib->getSavedFilters();
+        
+        return $this->response->setJSON([
+            'success' => true,
+            'filters' => $savedFilters,
+            'has_filters' => !empty(array_filter($savedFilters))
+        ]);
+    }
+
+    /**
+     * Экспорт фильтров в JSON (для резервной копии)
+     */
+    public function exportFilters()
+    {
+        $savedFilters = $this->adminLib->getSavedFilters();
+        $exportData = [
+            'filters' => $savedFilters,
+            'exported_at' => date('Y-m-d H:i:s'),
+            'admin_key' => $this->adminLib->getAdminKey(),
+            'version' => '1.0'
+        ];
+
+        $filename = 'admin_filters_' . date('Y-m-d') . '.json';
+        
+        header('Content-Type: application/json');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        
+        echo json_encode($exportData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    /**
+     * Импорт фильтров из JSON
+     */
+    public function importFilters()
+    {
+        if ($this->request->getMethod() !== 'POST') {
+            return redirect()->back()->with('error', 'Неверный метод запроса');
+        }
+
+        $file = $this->request->getFile('filter_file');
+        
+        if (!$file || !$file->isValid()) {
+            return redirect()->back()->with('error', 'Файл не выбран или поврежден');
+        }
+
+        try {
+            $content = file_get_contents($file->getTempName());
+            $importData = json_decode($content, true);
+            
+            if (!$importData || !isset($importData['filters'])) {
+                return redirect()->back()->with('error', 'Неверный формат файла');
+            }
+
+            $this->adminLib->saveFilters($importData['filters']);
+            
+            return redirect()->back()->with('success', 'Фильтры успешно импортированы');
+            
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Ошибка импорта: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Получение истории применения фильтров (статистика)
+     */
+    public function filtersStats()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'Invalid request']);
+        }
+
+        $savedFilters = $this->adminLib->getSavedFilters();
+        $currentFilters = [
+            'search' => $this->request->getGet('search'),
+            'city_id' => $this->request->getGet('city'),
+            'restaurant_type' => $this->request->getGet('restaurant_type'),
+            'status' => $this->request->getGet('status'),
+            'data_filter' => $this->request->getGet('data_filter'),
+        ];
+
+        // Подсчет результатов для текущих фильтров
+        $totalRestaurants = $this->adminLib->countRestaurants(array_filter($currentFilters));
+
+        $stats = [
+            'saved_filters_count' => count(array_filter($savedFilters)),
+            'current_filters_count' => count(array_filter($currentFilters)),
+            'results_with_current_filters' => $totalRestaurants,
+            'filters_match_saved' => $this->filtersMatch($savedFilters, $currentFilters),
+            'most_used_filter' => $this->getMostUsedFilter($savedFilters),
+            'session_duration' => $this->getSessionDuration()
+        ];
+
+        return $this->response->setJSON([
+            'success' => true,
+            'stats' => $stats
+        ]);
+    }
+
+    /**
+     * Вспомогательный метод: проверка совпадения фильтров
+     */
+    private function filtersMatch($saved, $current): bool
+    {
+        $cleanSaved = array_filter($saved);
+        $cleanCurrent = array_filter($current);
+        
+        return $cleanSaved == $cleanCurrent;
+    }
+
+    /**
+     * Вспомогательный метод: получение наиболее часто используемого фильтра
+     */
+    private function getMostUsedFilter($filters): ?string
+    {
+        $activeFilters = array_filter($filters);
+        
+        if (empty($activeFilters)) {
+            return null;
+        }
+
+        // Возвращаем первый активный фильтр (можно улучшить логику)
+        return array_keys($activeFilters)[0];
+    }
+
+    /**
+     * Вспомогательный метод: получение продолжительности сессии
+     */
+    private function getSessionDuration(): int
+    {
+        $loginTime = session()->get('admin_login_time');
+        return $loginTime ? (time() - $loginTime) : 0;
     }
 }

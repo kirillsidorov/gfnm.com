@@ -66,12 +66,21 @@
     </div>
     <?php endif; ?>
 
-    <!-- Фильтры поиска -->
+    <!-- Фильтры поиска с запоминанием -->
     <div class="card shadow mb-4">
         <div class="card-header">
-            <h6 class="m-0 font-weight-bold text-primary">
-                <i class="fas fa-filter me-2"></i>Фильтры поиска
-            </h6>
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-filter me-2"></i>Фильтры поиска
+                </h6>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="rememberFilters" 
+                           <?= !empty($saved_filters_exist ?? false) ? 'checked' : '' ?>>
+                    <label class="form-check-label text-muted small" for="rememberFilters">
+                        <i class="fas fa-memory me-1"></i>Запомнить фильтры
+                    </label>
+                </div>
+            </div>
         </div>
         <div class="card-body">
             <form method="GET" id="filterForm" class="row g-3">
@@ -122,7 +131,7 @@
                     </select>
                 </div>
 
-                <!-- Статус активности - ИСПРАВЛЕНО: активные по умолчанию -->
+                <!-- Статус активности -->
                 <div class="col-md-2">
                     <label for="status" class="form-label">Статус</label>
                     <select class="form-select" name="status" id="status">
@@ -161,20 +170,20 @@
                 <!-- Кнопки действий -->
                 <div class="col-md-1 d-flex align-items-end">
                     <div class="btn-group w-100">
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary" title="Применить фильтры">
                             <i class="fas fa-search"></i>
                         </button>
-                        <a href="<?= base_url('admin/restaurants') ?>" class="btn btn-outline-secondary">
+                        <button type="button" class="btn btn-outline-secondary" onclick="resetFilters()" title="Сбросить фильтры">
                             <i class="fas fa-undo"></i>
-                        </a>
+                        </button>
                     </div>
                 </div>
             </form>
 
-            <!-- Быстрые фильтры -->
+            <!-- Быстрые фильтры и активные фильтры -->
             <?php if (!empty(array_filter($filters)) || $show_all): ?>
                 <div class="mt-3">
-                    <div class="d-flex flex-wrap align-items-center gap-2">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                         <span class="text-muted me-2">Быстрые действия:</span>
                         
                         <!-- Фильтры типов -->
@@ -196,10 +205,16 @@
                             <i class="fas fa-magic me-1"></i>Автоопределение типов
                         </button>
                         
-                        <!-- Сброс фильтров -->
-                        <a href="<?= base_url('admin/restaurants') ?>" class="btn btn-outline-secondary btn-sm">
-                            <i class="fas fa-times me-1"></i>Сбросить
-                        </a>
+                        <!-- Управление запоминанием -->
+                        <button type="button" class="btn btn-outline-info btn-sm" onclick="saveCurrentFilters()" 
+                                title="Сохранить текущие фильтры">
+                            <i class="fas fa-save me-1"></i>Сохранить
+                        </button>
+                        
+                        <!-- Сброс всех фильтров -->
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearAllFilters()">
+                            <i class="fas fa-times me-1"></i>Очистить всё
+                        </button>
                     </div>
                     
                     <!-- Активные фильтры -->
@@ -229,12 +244,22 @@
                                     
                                     echo $filterDisplayNames[$key] ?? ucfirst($key) . ': ' . $value;
                                     ?>
+                                    <button type="button" class="btn-close btn-close-white ms-1" 
+                                            onclick="removeFilter('<?= $key ?>')" 
+                                            style="font-size: 0.6em;" title="Удалить фильтр"></button>
                                 </span>
                             <?php endif; ?>
                         <?php endforeach; ?>
                         
                         <?php if ($show_all): ?>
                             <span class="badge bg-info me-1">🔍 Показать все</span>
+                        <?php endif; ?>
+                        
+                        <!-- Индикатор сохраненных фильтров -->
+                        <?php if (!empty(session()->get('admin_filters'))): ?>
+                            <span class="badge bg-success me-1" title="Фильтры сохранены в сессии">
+                                <i class="fas fa-check"></i> Сохранено
+                            </span>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -1026,5 +1051,249 @@ function showAlert(type, message) {
         }, 5000);
     }
 }
+//по фильтрам
+$(document).ready(function() {
+    // Проверяем статус запоминания фильтров при загрузке
+    checkRememberStatus();
+    
+    // Обработка переключателя "Запомнить фильтры"
+    $('#rememberFilters').on('change', function() {
+        const isChecked = this.checked;
+        
+        if (isChecked) {
+            // Включаем запоминание - сохраняем текущие фильтры
+            saveCurrentFilters();
+            showAlert('success', 'Запоминание фильтров включено');
+        } else {
+            // Выключаем запоминание - очищаем сессию
+            clearSavedFilters();
+            showAlert('info', 'Запоминание фильтров отключено');
+        }
+    });
+    
+    // Автоматическое сохранение при изменении фильтров (если включено запоминание)
+    $('#city, #status, #data_filter, #restaurant_type').on('change', function() {
+        if ($('#rememberFilters').is(':checked')) {
+            // Небольшая задержка для сохранения
+            setTimeout(() => {
+                saveCurrentFiltersQuietly();
+            }, 100);
+        }
+        
+        // Отправляем форму
+        $('#filterForm').submit();
+    });
+    
+    // Поиск по Enter с автосохранением
+    $('#search').on('keypress', function(e) {
+        if (e.which === 13) {
+            if ($('#rememberFilters').is(':checked')) {
+                saveCurrentFiltersQuietly();
+            }
+            $('#filterForm').submit();
+        }
+    });
+    
+    // Остальные обработчики...
+    $('.restaurant-checkbox').on('change', function() {
+        updateBulkActions();
+        updateSelectAllState();
+    });
+    
+    $('#selectAll').on('change', function() {
+        $('.restaurant-checkbox').prop('checked', this.checked);
+        updateBulkActions();
+    });
+});
+
+// Проверка статуса запоминания при загрузке
+function checkRememberStatus() {
+    // Проверяем есть ли сохраненные фильтры на сервере
+    $.ajax({
+        url: '<?= base_url('admin/filters/status') ?>',
+        method: 'GET',
+        dataType: 'json',
+        success: function(response) {
+            if (response.has_saved_filters) {
+                $('#rememberFilters').prop('checked', true);
+            }
+        },
+        error: function() {
+            // Если ошибка API, проверяем локально
+            const hasActiveFilters = <?= !empty(array_filter($filters)) ? 'true' : 'false' ?>;
+            if (hasActiveFilters) {
+                $('#rememberFilters').prop('checked', true);
+            }
+        }
+    });
+}
+
+// Сохранение текущих фильтров
+function saveCurrentFilters() {
+    const filters = getFormFilters();
+    
+    $.ajax({
+        url: '<?= base_url('admin/filters/save') ?>',
+        method: 'POST',
+        data: {
+            filters: filters,
+            '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                updateFilterBadges();
+                showAlert('success', 'Фильтры сохранены');
+            }
+        },
+        error: function() {
+            showAlert('danger', 'Ошибка сохранения фильтров');
+        }
+    });
+}
+
+// Тихое сохранение без уведомлений
+function saveCurrentFiltersQuietly() {
+    const filters = getFormFilters();
+    
+    $.ajax({
+        url: '<?= base_url('admin/filters/save') ?>',
+        method: 'POST',
+        data: {
+            filters: filters,
+            '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
+        },
+        dataType: 'json'
+        // Без обработки результата для тихого сохранения
+    });
+}
+
+// Очистка сохраненных фильтров
+function clearSavedFilters() {
+    $.ajax({
+        url: '<?= base_url('admin/filters/clear') ?>',
+        method: 'POST',
+        data: {
+            '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
+        },
+        dataType: 'json',
+        success: function(response) {
+            updateFilterBadges();
+        }
+    });
+}
+
+// Получение текущих фильтров из формы
+function getFormFilters() {
+    return {
+        search: $('#search').val(),
+        city_id: $('#city').val(),
+        restaurant_type: $('#restaurant_type').val(),
+        status: $('#status').val(),
+        data_filter: $('#data_filter').val()
+    };
+}
+
+// Сброс фильтров
+function resetFilters() {
+    // Очищаем форму
+    $('#filterForm')[0].reset();
+    
+    // Если включено запоминание, очищаем и сохраненные фильтры
+    if ($('#rememberFilters').is(':checked')) {
+        clearSavedFilters();
+    }
+    
+    // Переходим на чистую страницу
+    window.location.href = '<?= base_url('admin/restaurants') ?>';
+}
+
+// Полная очистка всего
+function clearAllFilters() {
+    if (confirm('Очистить все фильтры и отключить запоминание?')) {
+        // Отключаем запоминание
+        $('#rememberFilters').prop('checked', false);
+        
+        // Очищаем сохраненные данные
+        clearSavedFilters();
+        
+        // Переходим на чистую страницу
+        window.location.href = '<?= base_url('admin/restaurants') ?>';
+    }
+}
+
+// Удаление конкретного фильтра
+function removeFilter(filterKey) {
+    const currentUrl = new URL(window.location);
+    const params = new URLSearchParams(currentUrl.search);
+    
+    // Маппинг имен параметров
+    const paramMapping = {
+        'city_id': 'city',
+        'restaurant_type': 'restaurant_type',
+        'status': 'status',
+        'data_filter': 'data_filter',
+        'search': 'search'
+    };
+    
+    const paramName = paramMapping[filterKey] || filterKey;
+    params.delete(paramName);
+    
+    // Обновляем URL
+    currentUrl.search = params.toString();
+    window.location.href = currentUrl.toString();
+}
+
+// Обновление индикаторов фильтров
+function updateFilterBadges() {
+    // Добавляем/убираем бейдж "Сохранено"
+    const hasSaved = $('#rememberFilters').is(':checked');
+    const savedBadge = $('.badge:contains("Сохранено")');
+    
+    if (hasSaved && savedBadge.length === 0) {
+        $('.badge').last().after('<span class="badge bg-success me-1" title="Фильтры сохранены в сессии"><i class="fas fa-check"></i> Сохранено</span>');
+    } else if (!hasSaved && savedBadge.length > 0) {
+        savedBadge.remove();
+    }
+}
+
+// Очистка поиска
+function clearSearch() {
+    $('#search').val('');
+    if ($('#rememberFilters').is(':checked')) {
+        saveCurrentFiltersQuietly();
+    }
+    $('#filterForm').submit();
+}
+
+// Показ уведомлений
+function showAlert(type, message) {
+    const alertClass = `alert-${type}`;
+    const iconClass = type === 'success' ? 'check-circle' : 
+                     type === 'danger' ? 'exclamation-circle' : 
+                     type === 'warning' ? 'exclamation-triangle' : 'info-circle';
+    
+    const alert = `
+        <div class="alert ${alertClass} alert-dismissible fade show position-fixed" 
+             style="top: 20px; right: 20px; z-index: 9999; min-width: 300px; max-width: 500px;">
+            <i class="fas fa-${iconClass} me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    $('body').append(alert);
+    
+    // Автоматическое скрытие
+    setTimeout(function() {
+        $('.alert').last().fadeOut('slow', function() {
+            $(this).remove();
+        });
+    }, 3000);
+}
+
 </script>
+
+
+
 <?= $this->endSection() ?>
