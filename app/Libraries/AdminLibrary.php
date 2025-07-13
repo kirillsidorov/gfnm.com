@@ -54,16 +54,28 @@ class AdminLibrary
             'total_restaurants' => 0,
             'total_cities' => 0,
             'active_restaurants' => 0,
-            'recent_additions' => 0
+            'inactive_restaurants' => 0,
+            'recent_additions' => 0,
+            'total_georgian' => 0,
+            'total_undetermined' => 0,
+            'total_all' => 0,
+            'total_active' => 0,
+            'total_inactive' => 0
         ];
 
         try {
             if ($this->db->tableExists('restaurants')) {
                 $stats['total_restaurants'] = $this->db->table('restaurants')->countAllResults();
+                $stats['total_all'] = $stats['total_restaurants']; // Алиас
                 $stats['active_restaurants'] = $this->db->table('restaurants')->where('is_active', 1)->countAllResults();
+                $stats['total_active'] = $stats['active_restaurants']; // Алиас
+                $stats['inactive_restaurants'] = $this->db->table('restaurants')->where('is_active', 0)->countAllResults();
+                $stats['total_inactive'] = $stats['inactive_restaurants']; // Алиас
                 $stats['recent_additions'] = $this->db->table('restaurants')
                     ->where('created_at >', date('Y-m-d', strtotime('-7 days')))
                     ->countAllResults();
+                $stats['total_georgian'] = $this->db->table('restaurants')->where('is_georgian', 1)->countAllResults();
+                $stats['total_undetermined'] = $this->db->table('restaurants')->where('is_georgian IS NULL')->countAllResults();
             }
             
             if ($this->db->tableExists('cities')) {
@@ -105,7 +117,7 @@ class AdminLibrary
     {
         try {
             if ($this->db->tableExists('cities')) {
-                return $this->db->table('cities')->get()->getResultArray();
+                return $this->db->table('cities')->orderBy('name')->get()->getResultArray();
             }
         } catch (\Exception $e) {
             log_message('error', 'AdminLibrary getCities error: ' . $e->getMessage());
@@ -114,266 +126,33 @@ class AdminLibrary
         return [];
     }
 
-   /**
-     * Получение списка ресторанов с фильтрами - ОБНОВЛЕННАЯ ВЕРСИЯ
+    /**
+     * Сохранение фильтров в сессию
      */
-    public function getRestaurants($filters = [], $limit = 50)
+    public function saveFilters(array $filters): void
     {
-        $restaurantModel = model('RestaurantModel');
-        
-        // Базовый запрос с объединением городов
-        $query = $restaurantModel
-            ->select('restaurants.*, cities.name as city_name, cities.slug as city_slug')
-            ->join('cities', 'cities.id = restaurants.city_id', 'left');
+        // Исключаем специальные параметры
+        $filtersToSave = array_filter($filters, function($key) {
+            return !in_array($key, ['page', 'show_all', 'export']);
+        }, ARRAY_FILTER_USE_KEY);
 
-        // Применяем фильтры
-        $this->applyRestaurantFilters($query, $filters);
-
-        // Получаем результаты
-        return $query->orderBy('restaurants.created_at', 'DESC')
-                    ->limit($limit)
-                    ->findAll();
+        $this->session->set('admin_filters', $filtersToSave);
     }
 
     /**
-     * Подсчет ресторанов с фильтрами
+     * Получение сохраненных фильтров
      */
-    public function getRestaurantsCount($filters = [])
+    public function getSavedFilters(): array
     {
-        $restaurantModel = model('RestaurantModel');
-        
-        $query = $restaurantModel
-            ->select('restaurants.id')
-            ->join('cities', 'cities.id = restaurants.city_id', 'left');
-
-        // Применяем те же фильтры
-        $this->applyRestaurantFilters($query, $filters);
-
-        return $query->countAllResults();
-    }
-    /**
-     * Применение фильтров к запросу - ОБНОВЛЕННАЯ ВЕРСИЯ с 3 состояниями
-     */
-    private function applyRestaurantFilters($query, $filters)
-    {
-        // Поиск по тексту
-        if (!empty($filters['search'])) {
-            $query->groupStart()
-                ->like('restaurants.name', $filters['search'])
-                ->orLike('restaurants.address', $filters['search'])
-                ->orLike('restaurants.description', $filters['search'])
-                ->orLike('restaurants.category', $filters['search'])
-                ->groupEnd();
-        }
-
-        // Фильтр по городу
-        if (!empty($filters['city_id'])) {
-            $query->where('restaurants.city_id', $filters['city_id']);
-        }
-
-        // Фильтр по статусу активности
-        if (!empty($filters['status'])) {
-            if ($filters['status'] === 'active') {
-                $query->where('restaurants.is_active', 1);
-            } elseif ($filters['status'] === 'inactive') {
-                $query->where('restaurants.is_active', 0);
-            }
-        }
-
-        // ОБНОВЛЕННЫЙ: Фильтр по типу ресторана с 3 состояниями
-        if (!empty($filters['restaurant_type'])) {
-            switch ($filters['restaurant_type']) {
-                case 'georgian':
-                    // Точно грузинские (is_georgian = 1)
-                    $query->where('restaurants.is_georgian', 1);
-                    break;
-                    
-                case 'non_georgian':
-                    // Точно не грузинские (is_georgian = 0)
-                    $query->where('restaurants.is_georgian', 0);
-                    break;
-                    
-                case 'undetermined':
-                    // Не определено (is_georgian = NULL)
-                    $query->where('restaurants.is_georgian IS NULL');
-                    break;
-                    
-                case 'auto_detected':
-                    // Не определено вручную, но автоматически определяется как грузинский
-                    $query->where('restaurants.is_georgian IS NULL')
-                        ->groupStart()
-                        ->like('restaurants.category', 'georgian', 'both')
-                        ->orLike('restaurants.category', 'грузин', 'both')
-                        ->orLike('restaurants.name', 'georgian', 'both')
-                        ->orLike('restaurants.name', 'georgia', 'both')
-                        ->orLike('restaurants.name', 'tbilisi', 'both')
-                        ->orLike('restaurants.name', 'khachapuri', 'both')
-                        ->orLike('restaurants.name', 'khinkali', 'both')
-                        ->orLike('restaurants.name', 'грузин', 'both')
-                        ->orLike('restaurants.name', 'тбилиси', 'both')
-                        ->orLike('restaurants.description', 'georgian', 'both')
-                        ->orLike('restaurants.description', 'georgia', 'both')
-                        ->orLike('restaurants.description', 'грузин', 'both')
-                        ->groupEnd();
-                    break;
-            }
-        }
-
-        // Фильтры по данным
-        if (!empty($filters['data_filter'])) {
-            switch ($filters['data_filter']) {
-                case 'no_coords':
-                    $query->groupStart()
-                        ->where('restaurants.latitude IS NULL')
-                        ->orWhere('restaurants.latitude', 0)
-                        ->orWhere('restaurants.longitude IS NULL') 
-                        ->orWhere('restaurants.longitude', 0)
-                        ->groupEnd();
-                    break;
-                case 'no_place_id':
-                    $query->groupStart()
-                        ->where('restaurants.google_place_id IS NULL')
-                        ->orWhere('restaurants.google_place_id', '')
-                        ->groupEnd();
-                    break;
-                case 'has_website':
-                    $query->where('restaurants.website IS NOT NULL')
-                        ->where('restaurants.website !=', '');
-                    break;
-                case 'no_photos':
-                    // Подзапрос для проверки наличия фотографий
-                    $query->where("restaurants.id NOT IN (
-                        SELECT DISTINCT restaurant_id 
-                        FROM restaurant_photos 
-                        WHERE restaurant_id IS NOT NULL
-                    )");
-                    break;
-            }
-        }
+        return $this->session->get('admin_filters') ?? [];
     }
 
     /**
-     * Определение типа ресторана - ОБНОВЛЕННАЯ ВЕРСИЯ
+     * Очистка фильтров
      */
-    public function getRestaurantType($restaurant)
+    public function clearFilters(): void
     {
-        $isGeorgian = $restaurant['is_georgian'];
-        
-        if ($isGeorgian === '1' || $isGeorgian === 1) {
-            return [
-                'type' => 'georgian',
-                'label' => 'Грузинский',
-                'badge_class' => 'success',
-                'icon' => 'flag',
-                'confirmed' => true
-            ];
-        } elseif ($isGeorgian === '0' || $isGeorgian === 0) {
-            return [
-                'type' => 'non_georgian',
-                'label' => 'Обычный',
-                'badge_class' => 'secondary',
-                'icon' => 'times',
-                'confirmed' => true
-            ];
-        } else {
-            // Автоматическое определение для null значений
-            $autoDetected = $this->isGeorgianRestaurantAuto($restaurant);
-            
-            if ($autoDetected['detected']) {
-                return [
-                    'type' => 'auto_detected',
-                    'label' => 'Возможно грузинский',
-                    'badge_class' => 'warning text-dark',
-                    'icon' => 'question',
-                    'confirmed' => false,
-                    'indicators' => $autoDetected['indicators']
-                ];
-            } else {
-                return [
-                    'type' => 'undetermined',
-                    'label' => 'Не определен',
-                    'badge_class' => 'light text-dark',
-                    'icon' => 'question-circle',
-                    'confirmed' => false
-                ];
-            }
-        }
-    }
-
-    /**
-     * Автоматическое определение грузинского ресторана - НОВЫЙ МЕТОД
-     */
-    private function isGeorgianRestaurantAuto($restaurant)
-    {
-        $georgianKeywords = [
-            'georgian', 'georgia', 'tbilisi', 'khachapuri', 'khinkali', 
-            'adjarian', 'supra', 'caucas', 'грузин', 'тбилиси', 'хачапури', 'хинкали'
-        ];
-        
-        $indicators = [];
-        $detected = false;
-        
-        // Проверяем категорию
-        $category = strtolower($restaurant['category'] ?? '');
-        foreach ($georgianKeywords as $keyword) {
-            if (strpos($category, $keyword) !== false) {
-                $detected = true;
-                $indicators[] = 'категория';
-                break;
-            }
-        }
-        
-        // Проверяем название
-        $name = strtolower($restaurant['name'] ?? '');
-        foreach ($georgianKeywords as $keyword) {
-            if (strpos($name, $keyword) !== false) {
-                $detected = true;
-                $indicators[] = 'название';
-                break;
-            }
-        }
-        
-        // Проверяем описание
-        $description = strtolower($restaurant['description'] ?? '');
-        foreach ($georgianKeywords as $keyword) {
-            if (strpos($description, $keyword) !== false) {
-                $detected = true;
-                if (!in_array('описание', $indicators)) {
-                    $indicators[] = 'описание';
-                }
-                break;
-            }
-        }
-        
-        return [
-            'detected' => $detected,
-            'indicators' => $indicators
-        ];
-    }
-    
-    /**
-     * Вспомогательная функция для определения типа ресторана - НОВЫЙ МЕТОД
-     */
-    public function isGeorgianRestaurant($restaurant)
-    {
-        $georgianKeywords = [
-            'georgian', 'georgia', 'tbilisi', 'khachapuri', 'khinkali', 
-            'adjarian', 'supra', 'caucas', 'грузин', 'тбилиси', 'хачапури', 'хинкали'
-        ];
-        
-        $searchText = strtolower(
-            ($restaurant['name'] ?? '') . ' ' . 
-            ($restaurant['category'] ?? '') . ' ' . 
-            ($restaurant['description'] ?? '')
-        );
-        
-        foreach ($georgianKeywords as $keyword) {
-            if (strpos($searchText, $keyword) !== false) {
-                return true;
-            }
-        }
-        
-        return false;
+        $this->session->remove('admin_filters');
     }
 
     /**
@@ -411,12 +190,113 @@ class AdminLibrary
     }
 
     /**
+     * Быстрое изменение типа ресторана
+     */
+    public function setRestaurantType(int $id, string $type): bool
+    {
+        try {
+            if (!$this->db->tableExists('restaurants')) {
+                return false;
+            }
+
+            $updateData = ['updated_at' => date('Y-m-d H:i:s')];
+
+            switch ($type) {
+                case 'georgian':
+                    $updateData['is_georgian'] = 1;
+                    break;
+                case 'non_georgian':
+                    $updateData['is_georgian'] = 0;
+                    break;
+                case 'undetermined':
+                    $updateData['is_georgian'] = null;
+                    break;
+                default:
+                    return false;
+            }
+
+            return $this->db->table('restaurants')->where('id', $id)->update($updateData);
+        } catch (\Exception $e) {
+            log_message('error', 'AdminLibrary setRestaurantType error: ' . $e->getMessage());
+        }
+
+        return false;
+    }
+
+    /**
+     * Автоопределение типов ресторанов
+     */
+    public function autoDetectTypes(): array
+    {
+        $stats = [
+            'total_processed' => 0,
+            'updated' => 0,
+            'georgian_found' => 0,
+            'remaining_undetermined' => 0
+        ];
+
+        try {
+            if (!$this->db->tableExists('restaurants')) {
+                return $stats;
+            }
+
+            // Получаем рестораны с неопределенным типом
+            $restaurants = $this->db->table('restaurants')->where('is_georgian IS NULL')->get()->getResultArray();
+            $stats['total_processed'] = count($restaurants);
+
+            $georgianKeywords = [
+                'georgian', 'georgia', 'tbilisi', 'khachapuri', 'khinkali', 
+                'adjarian', 'supra', 'caucas', 'грузин', 'тбилиси', 
+                'хачапури', 'хинкали', 'кавказ', 'сухуми'
+            ];
+
+            foreach ($restaurants as $restaurant) {
+                $isGeorgian = false;
+                $text = strtolower(
+                    ($restaurant['name'] ?? '') . ' ' . 
+                    ($restaurant['category'] ?? '') . ' ' . 
+                    ($restaurant['description'] ?? '')
+                );
+
+                // Проверяем наличие грузинских ключевых слов
+                foreach ($georgianKeywords as $keyword) {
+                    if (strpos($text, $keyword) !== false) {
+                        $isGeorgian = true;
+                        break;
+                    }
+                }
+
+                if ($isGeorgian) {
+                    $this->db->table('restaurants')->where('id', $restaurant['id'])->update([
+                        'is_georgian' => 1,
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ]);
+                    $stats['updated']++;
+                    $stats['georgian_found']++;
+                }
+            }
+
+            $stats['remaining_undetermined'] = $this->db->table('restaurants')->where('is_georgian IS NULL')->countAllResults();
+
+        } catch (\Exception $e) {
+            log_message('error', 'AdminLibrary autoDetectTypes error: ' . $e->getMessage());
+        }
+
+        return $stats;
+    }
+
+    /**
      * Удаление ресторана
      */
     public function deleteRestaurant(int $id): bool
     {
         try {
             if ($this->db->tableExists('restaurants')) {
+                // Также удаляем связанные фотографии если есть таблица
+                if ($this->db->tableExists('restaurant_photos')) {
+                    $this->db->table('restaurant_photos')->where('restaurant_id', $id)->delete();
+                }
+                
                 return $this->db->table('restaurants')->where('id', $id)->delete();
             }
         } catch (\Exception $e) {
@@ -467,215 +347,42 @@ class AdminLibrary
         return [];
     }
 
-   /**
-     * Массовые операции с ресторанами - ОБНОВЛЕННАЯ ВЕРСИЯ
+    /**
+     * Массовые операции с ресторанами
      */
-    public function bulkOperationRestaurants($action, $restaurantIds)
+    public function bulkOperationRestaurants(string $action, array $ids): int
     {
-        if (empty($restaurantIds) || !is_array($restaurantIds)) {
-            return 0;
-        }
-
-        $restaurantModel = model('RestaurantModel');
-        $affected = 0;
-
         try {
+            if (!$this->db->tableExists('restaurants') || empty($ids)) {
+                return 0;
+            }
+
             switch ($action) {
                 case 'activate':
-                    $affected = $restaurantModel->whereIn('id', $restaurantIds)
-                                            ->set(['is_active' => 1, 'updated_at' => date('Y-m-d H:i:s')])
-                                            ->update();
-                    break;
+                    return $this->db->table('restaurants')
+                                   ->whereIn('id', $ids)
+                                   ->update(['is_active' => 1, 'updated_at' => date('Y-m-d H:i:s')]);
 
                 case 'deactivate':
-                    $affected = $restaurantModel->whereIn('id', $restaurantIds)
-                                            ->set(['is_active' => 0, 'updated_at' => date('Y-m-d H:i:s')])
-                                            ->update();
-                    break;
+                    return $this->db->table('restaurants')
+                                   ->whereIn('id', $ids)
+                                   ->update(['is_active' => 0, 'updated_at' => date('Y-m-d H:i:s')]);
 
                 case 'delete':
-                    // Сначала удаляем связанные фотографии
-                    $this->deleteRestaurantPhotos($restaurantIds);
+                    // Удаляем связанные фотографии
+                    if ($this->db->tableExists('restaurant_photos')) {
+                        $this->db->table('restaurant_photos')->whereIn('restaurant_id', $ids)->delete();
+                    }
+                    return $this->db->table('restaurants')->whereIn('id', $ids)->delete();
                     
-                    // Затем удаляем рестораны
-                    $affected = $restaurantModel->whereIn('id', $restaurantIds)->delete();
-                    break;
-
                 case 'geocode':
-                    // Запускаем геокодирование для выбранных ресторанов
-                    $affected = $this->geocodeRestaurants($restaurantIds);
-                    break;
-
-                default:
-                    return 0;
-            }
-
-            return $affected;
-
-        } catch (\Exception $e) {
-            log_message('error', 'Bulk operation error: ' . $e->getMessage());
-            return 0;
-        }
-    }
-    /**
-     * Удаление фотографий ресторанов - НОВЫЙ МЕТОД
-     */
-    private function deleteRestaurantPhotos($restaurantIds)
-    {
-        try {
-            $photoModel = new \App\Models\RestaurantPhotoModel();
-            
-            foreach ($restaurantIds as $restaurantId) {
-                $photos = $photoModel->getRestaurantPhotos($restaurantId);
-                
-                foreach ($photos as $photo) {
-                    // Удаляем физический файл
-                    $filePath = FCPATH . '../' . $photo['file_path'];
-                    if (file_exists($filePath)) {
-                        unlink($filePath);
-                    }
-                    
-                    // Удаляем запись из БД
-                    $photoModel->deletePhoto($photo['id']);
-                }
+                    // Можно добавить логику геокодирования
+                    return count($ids); // Заглушка
             }
         } catch (\Exception $e) {
-            log_message('error', 'Error deleting restaurant photos: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Геокодирование ресторанов - НОВЫЙ МЕТОД
-     */
-    private function geocodeRestaurants($restaurantIds)
-    {
-        $geocoded = 0;
-        
-        try {
-            $restaurantModel = model('RestaurantModel');
-            
-            foreach ($restaurantIds as $restaurantId) {
-                $restaurant = $restaurantModel->find($restaurantId);
-                
-                if ($restaurant && !empty($restaurant['address'])) {
-                    // Здесь должна быть интеграция с сервисом геокодирования
-                    // Пока просто помечаем как обработанные
-                    
-                    // Заглушка для координат (в реальности здесь будет API запрос)
-                    $mockCoordinates = $this->getMockCoordinates($restaurant['address']);
-                    
-                    if ($mockCoordinates) {
-                        $restaurantModel->update($restaurantId, [
-                            'latitude' => $mockCoordinates['lat'],
-                            'longitude' => $mockCoordinates['lng'],
-                            'updated_at' => date('Y-m-d H:i:s')
-                        ]);
-                        
-                        $geocoded++;
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-            log_message('error', 'Geocoding error: ' . $e->getMessage());
-        }
-        
-        return $geocoded;
-    }
-
-    /**
-     * Заглушка для координат - ВРЕМЕННЫЙ МЕТОД
-     */
-    private function getMockCoordinates($address)
-    {
-        // В реальности здесь будет запрос к Google Geocoding API
-        // Пока возвращаем примерные координаты для NYC
-        if (stripos($address, 'New York') !== false || stripos($address, 'NY') !== false) {
-            return [
-                'lat' => 40.7580 + (rand(-1000, 1000) / 10000), // Небольшое случайное отклонение
-                'lng' => -73.9855 + (rand(-1000, 1000) / 10000)
-            ];
-        }
-        
-        return null;
-    }
-
-    /**
-     * Экспорт ресторанов в CSV
-     */
-    public function exportRestaurantsCSV(): void
-    {
-        try {
-            $restaurants = [];
-            
-            if ($this->db->tableExists('restaurants') && $this->db->tableExists('cities')) {
-                $restaurants = $this->db->table('restaurants')
-                    ->select('restaurants.*, cities.name as city_name')
-                    ->join('cities', 'cities.id = restaurants.city_id', 'left')
-                    ->get()
-                    ->getResultArray();
-            }
-
-            $filename = 'restaurants_' . date('Y-m-d') . '.csv';
-            
-            header('Content-Type: text/csv');
-            header('Content-Disposition: attachment; filename="' . $filename . '"');
-            
-            $output = fopen('php://output', 'w');
-            
-            // Headers
-            fputcsv($output, ['ID', 'Name', 'City', 'Address', 'Phone', 'Website', 'Rating', 'Price Level', 'Active']);
-            
-            // Data
-            foreach ($restaurants as $restaurant) {
-                fputcsv($output, [
-                    $restaurant['id'] ?? '',
-                    $restaurant['name'] ?? '',
-                    $restaurant['city_name'] ?? '',
-                    $restaurant['address'] ?? '',
-                    $restaurant['phone'] ?? '',
-                    $restaurant['website'] ?? '',
-                    $restaurant['rating'] ?? '',
-                    $restaurant['price_level'] ?? '',
-                    ($restaurant['is_active'] ?? 0) ? 'Yes' : 'No'
-                ]);
-            }
-            
-            fclose($output);
-            exit;
-            
-        } catch (\Exception $e) {
-            log_message('error', 'AdminLibrary exportRestaurantsCSV error: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Проверка состояния базы данных
-     */
-    public function getDatabaseStatus(): array
-    {
-        $status = [
-            'connected' => false,
-            'tables' => [],
-            'required_tables' => ['restaurants', 'cities'],
-            'missing_tables' => [],
-            'error' => null
-        ];
-
-        try {
-            // Тестируем подключение
-            $this->db->query('SELECT 1');
-            $status['connected'] = true;
-            
-            // Получаем список таблиц
-            $status['tables'] = $this->db->listTables();
-            
-            // Проверяем необходимые таблицы
-            $status['missing_tables'] = array_diff($status['required_tables'], $status['tables']);
-            
-        } catch (\Exception $e) {
-            $status['error'] = $e->getMessage();
+            log_message('error', 'AdminLibrary bulkOperationRestaurants error: ' . $e->getMessage());
         }
 
-        return $status;
+        return 0;
     }
 }

@@ -590,8 +590,8 @@
                     </table>
                 </div>
 
-                <!-- Пагинация (если есть) -->
-                <?php if (isset($pager)): ?>
+                <!-- Пагинация (ИСПРАВЛЕННАЯ ВЕРСИЯ) -->
+                <?php if (isset($pager) && method_exists($pager, 'links')): ?>
                     <div class="card-footer">
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="text-muted">
@@ -599,6 +599,44 @@
                             </div>
                             <div>
                                 <?= $pager->links() ?>
+                            </div>
+                        </div>
+                    </div>
+                <?php elseif (isset($pager) && is_array($pager)): ?>
+                    <!-- Если пагинация пришла как массив (fallback) -->
+                    <div class="card-footer">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="text-muted">
+                                Показано <?= count($restaurants) ?> из <?= $total_restaurants ?? 'неизвестно' ?> записей
+                            </div>
+                            <div>
+                                <nav aria-label="Page navigation">
+                                    <ul class="pagination pagination-sm">
+                                        <?php if ($pager['hasPrev']): ?>
+                                            <li class="page-item">
+                                                <a class="page-link" href="<?= current_url() ?>?page=<?= $pager['currentPage'] - 1 ?>&<?= http_build_query($filters) ?>">
+                                                    <i class="fas fa-chevron-left"></i>
+                                                </a>
+                                            </li>
+                                        <?php endif; ?>
+                                        
+                                        <?php for ($i = max(1, $pager['currentPage'] - 2); $i <= min($pager['totalPages'], $pager['currentPage'] + 2); $i++): ?>
+                                            <li class="page-item <?= $i == $pager['currentPage'] ? 'active' : '' ?>">
+                                                <a class="page-link" href="<?= current_url() ?>?page=<?= $i ?>&<?= http_build_query($filters) ?>">
+                                                    <?= $i ?>
+                                                </a>
+                                            </li>
+                                        <?php endfor; ?>
+                                        
+                                        <?php if ($pager['hasNext']): ?>
+                                            <li class="page-item">
+                                                <a class="page-link" href="<?= current_url() ?>?page=<?= $pager['currentPage'] + 1 ?>&<?= http_build_query($filters) ?>">
+                                                    <i class="fas fa-chevron-right"></i>
+                                                </a>
+                                            </li>
+                                        <?php endif; ?>
+                                    </ul>
+                                </nav>
                             </div>
                         </div>
                     </div>

@@ -112,7 +112,7 @@ $routes->group('admin', ['filter' => 'adminauth'], function($routes) {
     $routes->get('restaurants', 'Admin::restaurants');
     $routes->match(['get', 'post'], 'restaurants/edit/(:num)', 'Admin::editRestaurant/$1');
     $routes->get('restaurants/delete/(:num)', 'Admin::deleteRestaurant/$1');
-    $routes->post('restaurants/bulk', 'Admin::bulkOperations');
+    $routes->post('restaurants/bulk', 'Admin::bulk');
 
     // ===== УПРАВЛЕНИЕ ФОТОГРАФИЯМИ РЕСТОРАНОВ =====
     $routes->match(['get', 'post'], 'restaurants/(:num)/photos', 'Admin::restaurantPhotos/$1');

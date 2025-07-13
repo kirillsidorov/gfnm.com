@@ -155,55 +155,275 @@ class Admin extends BaseController
 
 
     /**
-     * Управление ресторанами - с фильтром активных по умолчанию
+     * ИСПРАВЛЕННЫЙ метод управления ресторанами с правильной пагинацией
      */
     public function restaurants()
     {
-        // Получение фильтров из запроса
-        $filters = [
-            'search' => $this->request->getGet('search'),
-            'city_id' => $this->request->getGet('city'),
-            'status' => $this->request->getGet('status'),
-            'data_filter' => $this->request->getGet('data_filter'),
-            'restaurant_type' => $this->request->getGet('restaurant_type'),
+        $request = $this->request;
+        
+        // Получаем текущие GET параметры
+        $currentFilters = [
+            'search' => $request->getGet('search'),
+            'city_id' => $request->getGet('city'), 
+            'status' => $request->getGet('status'),
+            'restaurant_type' => $request->getGet('restaurant_type'),
+            'data_filter' => $request->getGet('data_filter'),
         ];
-
-        // Параметр показать все
-        $showAll = $this->request->getGet('show_all');
-
-        // ИСПРАВЛЕНО: Если нет фильтра по статусу и нет параметра show_all, по умолчанию показываем только активные
-        if (empty($filters['status']) && !$showAll) {
-            $filters['status'] = 'active';
+        
+        // Специальная обработка для "показать все"
+        $show_all = $request->getGet('show_all') === '1';
+        
+        // Объединяем с сохраненными фильтрами из сессии
+        $savedFilters = $this->adminLib->getSavedFilters();
+        
+        // Если есть GET параметры, используем их, иначе берем из сессии
+        $hasGetParams = !empty(array_filter($currentFilters)) || $show_all;
+        
+        if ($hasGetParams) {
+            $filters = array_filter($currentFilters); // Убираем пустые значения
+            if ($show_all) {
+                $filters['status'] = ''; // Показать все
+            } else {
+                // Если статус не указан, устанавливаем 'active' по умолчанию
+                if (!isset($filters['status'])) {
+                    $filters['status'] = 'active';
+                }
+            }
+            
+            // Сохраняем фильтры в сессию (кроме show_all)
+            if (!$show_all) {
+                $this->adminLib->saveFilters($filters);
+            }
+        } else {
+            // Берем из сессии или устанавливаем дефолты
+            $filters = array_merge(['status' => 'active'], $savedFilters);
         }
 
-        // Получаем рестораны через AdminLibrary с обновленными фильтрами
-        $restaurants = $this->adminLib->getRestaurants($filters, 100);
+        // ИСПРАВЛЯЕМ ПАГИНАЦИЮ: используем встроенный пагинатор CodeIgniter
+        $restaurantModel = model('RestaurantModel');
         
-        // Получаем города для фильтра
+        // Создаем правильный запрос с фильтрами через модель
+        $builder = $restaurantModel->select('restaurants.*, cities.name as city_name')
+                                ->join('cities', 'cities.id = restaurants.city_id', 'left');
+        
+        // Применяем фильтры напрямую к builder
+        $this->applyFiltersToBuilder($builder, $filters);
+        
+        // Настройка пагинации
+        $perPage = 50;
+        $page = $request->getGet('page') ?? 1;
+        
+        // Получаем данные с пагинацией
+        $restaurants = $builder->orderBy('restaurants.created_at', 'DESC')
+                            ->paginate($perPage, 'default', $page);
+        
+        // Получаем объект пагинатора
+        $pager = $restaurantModel->pager;
+        $totalRestaurants = $builder->countAllResults(false); // false чтобы не сбросить запрос
+        
+        // Получаем статистику и города
+        $stats = $this->adminLib->getStats();
         $cities = $this->adminLib->getCities();
-        
-        // Подсчитываем общее количество
-        $totalRestaurants = $this->adminLib->getRestaurantsCount($filters);
-        
-        // Статистика для информации
-        $stats = [
-            'total_all' => $this->adminLib->getRestaurantsCount([]), // Все рестораны
-            'total_active' => $this->adminLib->getRestaurantsCount(['status' => 'active']), // Активные
-            'total_inactive' => $this->adminLib->getRestaurantsCount(['status' => 'inactive']), // Неактивные
-        ];
 
         $data = [
-            'title' => 'Управление ресторанами - Админка',
+            'title' => 'Управление ресторанами - Georgian Food Admin',
             'restaurants' => $restaurants,
             'cities' => $cities,
             'filters' => $filters,
-            'total_restaurants' => $totalRestaurants,
             'stats' => $stats,
-            'show_all' => $showAll // ДОБАВЛЕНО: передаем параметр в представление
+            'show_all' => $show_all,
+            'total_restaurants' => $totalRestaurants,
+            'pager' => $pager // Теперь это правильный объект пагинатора
         ];
 
         return view('admin/restaurants', $data);
     }
+
+    /**
+     * Вспомогательный метод для применения фильтров к builder
+     */
+    private function applyFiltersToBuilder($builder, array $filters): void
+    {
+        // Фильтр по статусу активности (по умолчанию показываем только активные)
+        if (isset($filters['status'])) {
+            if ($filters['status'] === 'active') {
+                $builder->where('restaurants.is_active', 1);
+            } elseif ($filters['status'] === 'inactive') {
+                $builder->where('restaurants.is_active', 0);
+            }
+            // Если 'all' или пустое - не добавляем условие
+        } else {
+            // По умолчанию показываем только активные
+            $builder->where('restaurants.is_active', 1);
+        }
+
+        // Поиск по тексту
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $builder->groupStart()
+                ->like('restaurants.name', $search)
+                ->orLike('restaurants.address', $search)
+                ->orLike('restaurants.description', $search)
+                ->orLike('restaurants.category', $search)
+                ->groupEnd();
+        }
+
+        // Фильтр по городу
+        if (!empty($filters['city_id'])) {
+            $builder->where('restaurants.city_id', $filters['city_id']);
+        }
+
+        // Фильтр по типу ресторана
+        if (!empty($filters['restaurant_type'])) {
+            switch ($filters['restaurant_type']) {
+                case 'georgian':
+                    $builder->where('restaurants.is_georgian', 1);
+                    break;
+                case 'non_georgian':
+                    $builder->where('restaurants.is_georgian', 0);
+                    break;
+                case 'undetermined':
+                    $builder->where('restaurants.is_georgian IS NULL');
+                    break;
+                case 'auto_detected':
+                    // Логика для автоматически определенных
+                    $builder->where('restaurants.is_georgian IS NULL');
+                    $georgianKeywords = ['georgian', 'грузин', 'khachapuri', 'khinkali', 'tbilisi', 'тбилиси'];
+                    $builder->groupStart();
+                    foreach ($georgianKeywords as $keyword) {
+                        $builder->orLike('restaurants.name', $keyword)
+                            ->orLike('restaurants.category', $keyword)
+                            ->orLike('restaurants.description', $keyword);
+                    }
+                    $builder->groupEnd();
+                    break;
+            }
+        }
+
+        // Фильтр по наличию данных
+        if (!empty($filters['data_filter'])) {
+            switch ($filters['data_filter']) {
+                case 'no_coords':
+                    $builder->groupStart()
+                        ->where('restaurants.latitude IS NULL')
+                        ->orWhere('restaurants.longitude IS NULL')
+                        ->orWhere('restaurants.latitude', '')
+                        ->orWhere('restaurants.longitude', '')
+                        ->groupEnd();
+                    break;
+                case 'no_place_id':
+                    $builder->groupStart()
+                        ->where('restaurants.google_place_id IS NULL')
+                        ->orWhere('restaurants.google_place_id', '')
+                        ->groupEnd();
+                    break;
+                case 'has_website':
+                    $builder->where('restaurants.website IS NOT NULL')
+                        ->where('restaurants.website !=', '');
+                    break;
+                case 'no_photos':
+                    // Рестораны без фотографий
+                    $builder->where('restaurants.id NOT IN (SELECT DISTINCT restaurant_id FROM restaurant_photos WHERE restaurant_id IS NOT NULL)');
+                    break;
+            }
+        }
+    }
+
+
+    /**
+     * Быстрое изменение типа ресторана (AJAX)
+     */
+    public function setRestaurantType($id)
+    {
+        if ($this->request->getMethod() !== 'POST') {
+            return $this->response->setJSON(['success' => false, 'message' => 'Invalid request method']);
+        }
+
+        $type = $this->request->getPost('type');
+        
+        if (!in_array($type, ['georgian', 'non_georgian', 'undetermined'])) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Неверный тип']);
+        }
+
+        if ($this->adminLib->setRestaurantType($id, $type)) {
+            $messages = [
+                'georgian' => 'Ресторан отмечен как грузинский',
+                'non_georgian' => 'Ресторан отмечен как обычный',
+                'undetermined' => 'Тип ресторана сброшен'
+            ];
+            
+            return $this->response->setJSON([
+                'success' => true, 
+                'message' => $messages[$type]
+            ]);
+        } else {
+            return $this->response->setJSON(['success' => false, 'message' => 'Ошибка обновления']);
+        }
+    }
+
+    /**
+     * Автоматическое определение типов ресторанов (AJAX)
+     */
+    public function autoDetectTypes()
+    {
+        if ($this->request->getMethod() !== 'POST') {
+            return $this->response->setJSON(['success' => false, 'message' => 'Invalid request method']);
+        }
+
+        $stats = $this->adminLib->autoDetectTypes();
+        
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => "Автоопределение завершено. Обновлено: {$stats['updated']} ресторанов",
+            'stats' => $stats
+        ]);
+    }
+
+    /**
+     * Обновленные массовые операции с поддержкой новых действий
+     */
+    public function bulk()
+    {
+        if ($this->request->getMethod() !== 'POST') {
+            return $this->response->setJSON(['success' => false, 'message' => 'Invalid request method']);
+        }
+
+        $action = $this->request->getPost('action');
+        $ids = $this->request->getPost('ids');
+
+        if (empty($ids) || !is_array($ids)) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Не выбраны рестораны']);
+        }
+
+        try {
+            $count = $this->adminLib->bulkOperationRestaurants($action, $ids);
+            
+            $messages = [
+                'activate' => "Активировано ресторанов: {$count}",
+                'deactivate' => "Деактивировано ресторанов: {$count}",
+                'delete' => "Удалено ресторанов: {$count}",
+                'geocode' => "Геокодирование {$count} ресторанов запущено"
+            ];
+
+            $message = $messages[$action] ?? "Операция выполнена для {$count} ресторанов";
+            
+            return $this->response->setJSON(['success' => true, 'message' => $message]);
+
+        } catch (\Exception $e) {
+            log_message('error', 'Bulk operation error: ' . $e->getMessage());
+            return $this->response->setJSON(['success' => false, 'message' => 'Ошибка выполнения операции']);
+        }
+    }
+
+    /**
+     * Очистка фильтров сессии
+     */
+    public function clearFilters()
+    {
+        $this->adminLib->clearFilters();
+        return redirect()->to('admin/restaurants')->with('success', 'Фильтры очищены');
+    }
+
 
     /**
      * Удаление ресторана
@@ -244,128 +464,13 @@ class Admin extends BaseController
         return view('admin/cities', $data);
     }
 
-    /**
-     * Массовые операции - ОБНОВЛЕННАЯ ВЕРСИЯ
-     */
+    // ОБНОВЛЕННЫЕ массовые операции (старый метод для совместимости)
     public function bulkOperations()
     {
-        if (!$this->request->isAJAX()) {
-            return $this->response->setJSON(['success' => false, 'message' => 'Invalid request']);
-        }
-        
-        $action = $this->request->getPost('action');
-        $restaurantIds = $this->request->getPost('ids');
-
-        if (empty($restaurantIds) || !is_array($restaurantIds)) {
-            return $this->response->setJSON(['success' => false, 'message' => 'Рестораны не выбраны']);
-        }
-
-        // Валидация ID
-        $restaurantIds = array_filter($restaurantIds, 'is_numeric');
-        if (empty($restaurantIds)) {
-            return $this->response->setJSON(['success' => false, 'message' => 'Неверные ID ресторанов']);
-        }
-
-        try {
-            $count = $this->adminLib->bulkOperationRestaurants($action, $restaurantIds);
-            
-            if ($count > 0) {
-                $actionNames = [
-                    'activate' => 'активировано',
-                    'deactivate' => 'деактивировано',
-                    'delete' => 'удалено'
-                ];
-                
-                $actionName = $actionNames[$action] ?? $action;
-                
-                return $this->response->setJSON([
-                    'success' => true,
-                    'message' => "Успешно {$actionName} {$count} ресторан(ов)",
-                    'affected' => $count
-                ]);
-            } else {
-                return $this->response->setJSON([
-                    'success' => false,
-                    'message' => 'Ошибка при выполнении операции'
-                ]);
-            }
-        } catch (\Exception $e) {
-            log_message('error', 'Bulk operation error: ' . $e->getMessage());
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Произошла ошибка: ' . $e->getMessage()
-            ]);
-        }
+        // Перенаправляем на новый метод bulk()
+        return $this->bulk();
     }
-
-    /**
-     * Быстрое изменение типа ресторана
-     */
-    public function setRestaurantType($restaurantId)
-    {
-        if (!$this->request->isAJAX()) {
-            return $this->response->setStatusCode(400)->setJSON(['error' => 'Invalid request']);
-        }
-
-        $restaurantModel = model('RestaurantModel');
-        $restaurant = $restaurantModel->find($restaurantId);
-        
-        if (!$restaurant) {
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Ресторан не найден'
-            ]);
-        }
-
-        $type = $this->request->getPost('type'); // 'georgian', 'non_georgian', или 'undetermined'
-        
-        $allowedTypes = ['georgian', 'non_georgian', 'undetermined'];
-        if (!in_array($type, $allowedTypes)) {
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Неверный тип ресторана'
-            ]);
-        }
-
-        // Определяем значение для поля is_georgian
-        $isGeorgianValue = null;
-        switch ($type) {
-            case 'georgian':
-                $isGeorgianValue = 1;
-                break;
-            case 'non_georgian':
-                $isGeorgianValue = 0;
-                break;
-            case 'undetermined':
-                $isGeorgianValue = null;
-                break;
-        }
-
-        try {
-            $restaurantModel->update($restaurantId, [
-                'is_georgian' => $isGeorgianValue,
-                'updated_at' => date('Y-m-d H:i:s')
-            ]);
-
-            $typeLabels = [
-                'georgian' => 'грузинский',
-                'non_georgian' => 'обычный',
-                'undetermined' => 'не определенный'
-            ];
-
-            return $this->response->setJSON([
-                'success' => true,
-                'message' => "Ресторан помечен как {$typeLabels[$type]}",
-                'new_type' => $type
-            ]);
-
-        } catch (\Exception $e) {
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Ошибка обновления: ' . $e->getMessage()
-            ]);
-        }
-    }
+    
 
     /**
      * Массовое автоматическое определение типов ресторанов
